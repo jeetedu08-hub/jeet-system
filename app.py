@@ -11,6 +11,7 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import io
+import json  # 클라우드 열쇠 사용을 위한 필수 부품
 
 # --- 1. 환경 및 폰트 설정 (클라우드 호환) ---
 font_path = "malgun.ttf"
@@ -25,14 +26,12 @@ plt.rcParams['axes.unicode_minus'] = False
 COLOR_NAVY = '#1A237E'; COLOR_RED = '#D32F2F'; COLOR_STUDENT = '#0056B3'
 COLOR_AVG = '#757575'; COLOR_GRID = '#E0E0E0'; COLOR_BG = '#F8F9FA'
 
-import json
-
-# --- 2. 구글 스프레드시트 연동 함수 (클라우드 비밀 금고 지원) ---
+# --- 2. 구글 스프레드시트 연동 함수 ---
 @st.cache_resource
 def get_google_sheet():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    # 클라우드 비밀 금고에 열쇠가 있으면 사용하고, 없으면 내 컴퓨터의 열쇠 사용
+    # 🚨 클라우드 비밀 금고 기능
     if "gcp_secret_string" in st.secrets:
         creds_dict = json.loads(st.secrets["gcp_secret_string"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -43,12 +42,22 @@ def get_google_sheet():
     doc = client.open("성적표")
     return doc
 
+def load_data():
+    doc = get_google_sheet()
+    ws_info = doc.worksheet('Test_Info')
+    ws_results = doc.worksheet('Student_Results')
+    
+    df_info = pd.DataFrame(ws_info.get_all_records())
+    df_results = pd.DataFrame(ws_results.get_all_records())
+    
+    df_results = df_results.replace('', 0).fillna(0)
+    return doc, ws_info, ws_results, df_info, df_results
+
 # --- 3. PDF 생성 함수 (전문가 분석 + 겹침 완벽 방지 + 간격 최적화) ---
 def generate_jeet_expert_report(target_name):
     try:
         _, _, _, df_info, df_results = load_data()
         
-        # 구글 시트의 모든 열 이름을 강제로 문자로 통일
         df_results.columns = df_results.columns.astype(str)
         
         df_info['배점'] = df_info['배점'].replace('', 3).fillna(3).astype(int)
@@ -91,12 +100,10 @@ def generate_jeet_expert_report(target_name):
             unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
             unit_data = unit_data.reindex([u for u in unit_order if u in unit_data.index])
   
-            # 클라우드 다운로드를 위한 메모리 버퍼
             pdf_buffer = io.BytesIO()
             with PdfPages(pdf_buffer) as pdf:
                 fig = plt.figure(figsize=(8.27, 11.69))
                 
-                # 배경 및 타이틀
                 border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
                 fig.patches.append(border)
                 fig.text(0.31, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
@@ -104,7 +111,6 @@ def generate_jeet_expert_report(target_name):
                 info_text = f"학교: {s_row.get('학교', '')}  |  학년: {student_grade}  |  이름: {student_name}"
                 fig.text(0.5, 0.84, info_text, ha='center', fontsize=15, fontweight='bold', color='#222')
   
-                # --- [차트 1] 방사형 차트 ---
                 ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
                 all_cats = cat_ratio.index.tolist()
                 ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
@@ -125,7 +131,6 @@ def generate_jeet_expert_report(target_name):
                 ax1.set_xticklabels([])
                 ax1.set_yticklabels([]) 
   
-                # 🚨 [거리 조절 완벽 적용] 라벨 및 수치 자동 정렬
                 for i in range(len(labels)):
                     angle = angles[i]
                     label_text = labels[i]
@@ -151,7 +156,6 @@ def generate_jeet_expert_report(target_name):
                 ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
                 ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
   
-                # --- [차트 2] 바 차트 ---
                 ax2 = fig.add_axes([0.55, 0.52, 0.35, 0.20])
                 x_pos = np.arange(len(unit_data))
                 bars = ax2.bar(x_pos, unit_data['득점'], color=COLOR_STUDENT, alpha=0.8, width=0.5, zorder=3)
@@ -167,7 +171,6 @@ def generate_jeet_expert_report(target_name):
                     ax2.text(bar.get_x() + bar.get_width()/2, s_v + 0.5, f"{s_v}", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT)
                     ax2.text(bar.get_x() + bar.get_width()/2, s_v + 0.5, f" ({a_v})", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED)
   
-                # --- [분석 섹션: 전문가 수준 자동 분석] ---
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
                 fig.text(0.11, 0.44, "▶ ", fontsize=15, fontweight='bold', color=COLOR_NAVY)
@@ -177,7 +180,6 @@ def generate_jeet_expert_report(target_name):
                 avg_val, total_avg_val = int(cat_ratio.mean()), int(avg_cat_ratio.mean())
                 diff_val = avg_val - total_avg_val
                 
-                # 강/약점 자동 추출
                 diff_cats = s_ordered - a_ordered
                 best_cat = diff_cats.idxmax() if not diff_cats.empty else "종합"
                 worst_cat = diff_cats.idxmin() if not diff_cats.empty else "종합"
@@ -207,7 +209,6 @@ def generate_jeet_expert_report(target_name):
                 wrapped_lines = [textwrap.fill(p, width=54) for p in diag_content.split('\n\n')]
                 fig.text(0.11, 0.41, "\n\n".join(wrapped_lines), fontsize=10.5, linespacing=1.8, va='top', ha='left', color='#333')
   
-                # --- [푸터] ---
                 line_footer = plt.Line2D([0.05, 0.95], [0.12, 0.12], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure)
                 fig.lines.append(line_footer)
                 campuses = [("수지 캠퍼스: 276-8003", "풍덕천로 129번길 16-1"), ("죽전 캠퍼스: 263-8003", "기흥구 죽현로 29"), ("광교 캠퍼스: 257-8003", "영통구 혜명로 10")]
@@ -243,7 +244,7 @@ with tab1:
         _, _, ws_results, df_info, df_results = load_data()
         question_numbers = df_info['문항번호'].tolist()
     except Exception as e:
-        st.error(f"구글 시트를 불러오는 데 실패했습니다. 열쇠 파일(secrets.json)과 공유 설정을 확인하세요.\n에러 내용: {e}")
+        st.error(f"구글 시트를 불러오는 데 실패했습니다. 에러 내용: {e}")
         question_numbers = []
 
     if question_numbers:
