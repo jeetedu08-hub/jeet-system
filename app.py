@@ -25,25 +25,23 @@ plt.rcParams['axes.unicode_minus'] = False
 COLOR_NAVY = '#1A237E'; COLOR_RED = '#D32F2F'; COLOR_STUDENT = '#0056B3'
 COLOR_AVG = '#757575'; COLOR_GRID = '#E0E0E0'; COLOR_BG = '#F8F9FA'
 
-# --- 2. 구글 스프레드시트 연동 함수 ---
+import json
+
+# --- 2. 구글 스프레드시트 연동 함수 (클라우드 비밀 금고 지원) ---
 @st.cache_resource
 def get_google_sheet():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name("secrets.json", scope)
+    
+    # 클라우드 비밀 금고에 열쇠가 있으면 사용하고, 없으면 내 컴퓨터의 열쇠 사용
+    if "gcp_secret_string" in st.secrets:
+        creds_dict = json.loads(st.secrets["gcp_secret_string"])
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    else:
+        creds = ServiceAccountCredentials.from_json_keyfile_name("secrets.json", scope)
+        
     client = gspread.authorize(creds)
     doc = client.open("성적표")
     return doc
-
-def load_data():
-    doc = get_google_sheet()
-    ws_info = doc.worksheet('Test_Info')
-    ws_results = doc.worksheet('Student_Results')
-    
-    df_info = pd.DataFrame(ws_info.get_all_records())
-    df_results = pd.DataFrame(ws_results.get_all_records())
-    
-    df_results = df_results.replace('', 0).fillna(0)
-    return doc, ws_info, ws_results, df_info, df_results
 
 # --- 3. PDF 생성 함수 (전문가 분석 + 겹침 완벽 방지 + 간격 최적화) ---
 def generate_jeet_expert_report(target_name):
