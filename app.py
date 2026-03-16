@@ -11,11 +11,13 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import io
-import json  # 클라우드 열쇠 사용을 위한 필수 부품
+import json
 
-# --- 1. 환경 및 폰트 설정 (클라우드 호환) ---
+# --- 1. 환경 및 폰트 설정 (클라우드 호환 강제 주입) ---
 font_path = "malgun.ttf"
 if os.path.exists(font_path):
+    # 🚨 외국 서버에 맑은 고딕 폰트를 강제로 인식시키는 마법의 코드
+    fm.fontManager.addfont(font_path)
     font_prop = fm.FontProperties(fname=font_path)
     plt.rcParams['font.family'] = font_prop.get_name()
 else:
