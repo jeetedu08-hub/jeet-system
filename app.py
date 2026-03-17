@@ -1,28 +1,15 @@
 import streamlit as st
 import pandas as pd
-import os
 from streamlit_gsheets import GSheetsConnection
 
-# 1. 페이지 기본 설정 (가장 위에 있어야 함)
+# 1. 페이지 기본 설정
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide")
-
 st.title("JEET 죽전캠퍼스 성적 통합 관리 시스템 📊")
 
-# ==========================================
-# 🚨 [보안 출입증 장착] 비밀 금고에서 출입증 꺼내오기
-# ==========================================
-if "GOOGLE_JSON" in st.secrets:
-    with open("google_creds.json", "w") as f:
-        f.write(st.secrets["GOOGLE_JSON"])
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google_creds.json"
-else:
-    st.error("스트림릿 Secrets에 출입증(GOOGLE_JSON)이 없습니다! 설정을 확인해주세요.")
-    st.stop()
-
-# 원장님의 구글 시트 주소
+# 구글 시트 주소
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1bYv3ff5xwzd4DS3EZUC9Xj6GSpeVmijobbW0svKpqXU/edit"
 
-# 2. 구글 시트 데이터 불러오기 (출입증 들고 당당하게 입장!)
+# 2. 구글 시트 연결 (이제 파이썬이 스스로 금고를 열고 출입증을 챙깁니다!)
 conn = st.connection("gsheets", type=GSheetsConnection)
 df_info = conn.read(spreadsheet=SHEET_URL, worksheet="Test_Info")
 df_results = conn.read(spreadsheet=SHEET_URL, worksheet="Student_Results")
@@ -90,7 +77,7 @@ with tab1:
                 new_df = pd.DataFrame([new_row], columns=columns)
                 updated_df = pd.concat([df_results, new_df], ignore_index=True)
                 
-                # 💡 입력(쓰기) 권한을 가지고 구글 시트에 성적 업데이트!
+                # 쓰기 권한을 이용해 구글 시트 업데이트
                 conn.update(spreadsheet=SHEET_URL, worksheet="Student_Results", data=updated_df)
                 
                 st.success(f"🎉 {student_name} 학생의 [{selected_test}] 성적이 성공적으로 저장되었습니다!")
