@@ -45,7 +45,7 @@ def get_google_sheet():
     doc = client.open_by_url("https://docs.google.com/spreadsheets/d/1bYv3ff5xwzd4DS3EZUC9Xj6GSpeVmijobbW0svKpqXU/edit")
     return doc
 
-# 🚨 속도 제한 방지! 2분간 데이터 기억하기
+# 🚨 속도 제한 방지 캐시
 @st.cache_data(ttl=120)
 def fetch_all_dataframes():
     doc = get_google_sheet()
@@ -118,22 +118,18 @@ def generate_jeet_expert_report(target_name, selected_test):
                 border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
                 fig.patches.append(border)
                 
-                # 🌟 [PDF 우측 상단 로고 삽입]
                 if os.path.exists("logo.png"):
                     logo_img = plt.imread("logo.png")
                     logo_ax = fig.add_axes([0.80, 0.88, 0.15, 0.08], zorder=15)
                     logo_ax.imshow(logo_img)
                     logo_ax.axis('off')
 
-                # 🌟 [위치 수정] 제목 위치
                 fig.text(0.31, 0.92, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
                 fig.text(0.33, 0.92, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
                 
-                # 🌟 [위치 수정] 학생 정보
                 info_text = f"[{selected_test}] 중등 수학 교육원 {student_name} 학생 심층 분석"
                 fig.text(0.5, 0.88, info_text, ha='center', fontsize=15, fontweight='bold', color='#222')
   
-                # 🌟 [위치 수정] 그래프 1
                 ax1 = fig.add_axes([0.10, 0.58, 0.32, 0.22], polar=True)
                 all_cats = cat_ratio.index.tolist()
                 ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
@@ -179,7 +175,6 @@ def generate_jeet_expert_report(target_name, selected_test):
                 ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
                 ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
   
-                # 🌟 [위치 수정] 그래프 2
                 ax2 = fig.add_axes([0.55, 0.58, 0.35, 0.20])
                 x_pos = np.arange(len(unit_data))
                 bars = ax2.bar(x_pos, unit_data['득점'], color=COLOR_STUDENT, alpha=0.8, width=0.5, zorder=3)
@@ -187,7 +182,6 @@ def generate_jeet_expert_report(target_name, selected_test):
                 ax2.set_xticks(x_pos)
                 ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
                 
-                # 🚨 [다시 부활한 핵심 방어막!] NaN 에러 방지
                 max_val = unit_data['배점'].max()
                 max_val = 10 if pd.isna(max_val) or max_val == 0 else max_val
                 ax2.set_ylim(0, max_val * 1.5)
@@ -273,11 +267,24 @@ except Exception as e:
 # 🌟 추가된 기능: 사이드바 시험 과정 선택
 # ==========================================
 st.sidebar.header("📚 시험 과정 선택")
+
+# 🚨 [새로 추가한 기능!] 파이썬의 기억력을 날려버리는 강력한 동기화 버튼!
+if st.sidebar.button("🔄 구글 시트 데이터 최신화", type="primary", use_container_width=True):
+    fetch_all_dataframes.clear()
+    st.rerun()
+st.sidebar.markdown("---")
+
 if '시험명' not in df_info_all.columns:
     st.error("구글 시트 Test_Info 시트 A열에 '시험명'을 추가해주세요.")
     st.stop()
 
-test_list = df_info_all['시험명'].dropna().unique().tolist()
+# 🚨 혹시 구글 시트에 빈칸이 있어도 무시하고 진짜 시험지 이름만 싹싹 긁어오도록 수정!
+test_list = [str(t) for t in df_info_all['시험명'].unique() if str(t).strip() != '']
+
+if not test_list:
+    st.sidebar.warning("구글 시트에 입력된 시험 정보가 없습니다.")
+    st.stop()
+
 selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
 
 df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
@@ -330,7 +337,7 @@ with tab1:
                         st.success(f"✅ '{clean_name}' 학생의 [{selected_test}] 성적이 구글 시트에 실시간으로 저장되었습니다!")
                         st.balloons()
                         
-                        # 🚨 성적 저장 후 캐시 비우기 (새로고침 없이 바로 반영)
+                        # 🚨 성적 저장 후 캐시 비우기
                         fetch_all_dataframes.clear()
                     except Exception as e:
                         st.error(f"저장 중 오류가 발생했습니다: {e}")
