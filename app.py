@@ -61,18 +61,20 @@ def load_data():
     return doc, ws_info, ws_results, df_info, df_results
 
 # --- 3. PDF 생성 함수 (원장님 오리지널 + 시험 필터링 추가) ---
+# --- 3. PDF 생성 함수 (원장님 오리지널 + 시험 필터링 + 단원 자동 인식 추가) ---
 def generate_jeet_expert_report(target_name, selected_test):
     try:
         _, _, _, df_info, df_results = load_data()
         
-        # 🌟 여기서 선택한 시험('1학년 1학기' 등)의 데이터만 싹 골라냅니다!
+        # 🌟 선택한 시험 데이터만 골라내기
         df_info = df_info[df_info['시험명'] == selected_test]
         df_results = df_results[df_results['시험명'] == selected_test]
         
         df_results.columns = df_results.columns.astype(str)
-        
         df_info['배점'] = df_info['배점'].replace('', 3).fillna(3).astype(int)
-        unit_order = ['유리수와 순환소수', '식의 계산', '일차부등식', '연립방정식', '일차함수']
+        
+        # 🚨 [핵심 해결 포인트] 하드코딩된 2학년 단원명 삭제! 시트에 적힌 단원명 그대로 자동 인식!
+        unit_order = df_info['단원'].drop_duplicates().tolist()
   
         q_cols = [str(q) for q in df_info['문항번호']]
         valid_cols = [col for col in df_results.columns if col in q_cols]
@@ -173,7 +175,12 @@ def generate_jeet_expert_report(target_name, selected_test):
                 ax2.scatter(x_pos, unit_avg_data['평균득점'], color=COLOR_RED, marker='_', s=1000, linewidth=3, zorder=4)
                 ax2.set_xticks(x_pos)
                 ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
-                ax2.set_ylim(0, unit_data['배점'].max() * 1.5)
+                
+                # 🚨 [추가 안전장치] 데이터가 비어있어도 에러(NaN)가 나지 않도록 방어막 추가!
+                max_val = unit_data['배점'].max()
+                max_val = 10 if pd.isna(max_val) or max_val == 0 else max_val
+                ax2.set_ylim(0, max_val * 1.5)
+                
                 ax2.set_title("▶ 단원별 성취도", pad=15, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
   
@@ -238,102 +245,3 @@ def generate_jeet_expert_report(target_name, selected_test):
     except Exception as e:
         error_msg = traceback.format_exc()
         return False, None, f"오류가 발생했습니다:\n{error_msg}"
-
-# ==========================================
-# --- 4. Streamlit 웹 UI 구성 ---
-# ==========================================
-st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
-st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
-
-try:
-    doc, ws_info, ws_results, df_info_all, df_results_all = load_data()
-except Exception as e:
-    st.error(f"구글 시트를 불러오는 데 실패했습니다. 에러 내용: {e}")
-    st.stop()
-
-# ==========================================
-# 🌟 추가된 기능: 사이드바 시험 과정 선택
-# ==========================================
-st.sidebar.header("📚 시험 과정 선택")
-if '시험명' not in df_info_all.columns:
-    st.error("구글 시트 Test_Info 시트 A열에 '시험명'을 추가해주세요.")
-    st.stop()
-
-test_list = df_info_all['시험명'].dropna().unique().tolist()
-selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
-
-df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
-st.sidebar.success(f"✅ 현재 [ {selected_test} ] 모드입니다.")
-
-tab1, tab2 = st.tabs(["📝 신규 성적 입력", "📑 개별 리포트 출력"])
-
-with tab1:
-    st.subheader(f"[{selected_test}] 신규 학생 성적 입력")
-    st.info("입력하신 데이터는 구글 스프레드시트에 실시간으로 저장됩니다.")
-    
-    question_numbers = df_info_filtered['문항번호'].tolist()
-
-    if question_numbers:
-        with st.form("data_input_form", clear_on_submit=True):
-            col1, col2, col3 = st.columns(3)
-            with col1: input_name = st.text_input("이름")
-            with col2: input_school = st.text_input("학교")
-            with col3: input_grade = st.selectbox("학년", ["중1", "중2", "중3"]) # 원장님 오리지널 폼!
-                
-            st.markdown("---")
-            st.write("**문항별 정답 입력 (1: 정답, 0: 오답)**")
-            
-            cols = st.columns(5)
-            answers = {}
-            for i, q_num in enumerate(question_numbers):
-                with cols[i % 5]:
-                    # 원장님 오리지널 넘버 인풋 방식 복구!
-                    answers[str(q_num)] = st.number_input(f"{q_num}번 문항", min_value=0, max_value=1, step=1)
-                    
-            submit_btn = st.form_submit_button("구글 시트에 성적 저장하기", type="primary")
-            
-            if submit_btn:
-                clean_name = input_name.strip()
-                if not clean_name:
-                    st.error("⚠️ 학생 이름을 입력해주세요.")
-                else:
-                    try:
-                        header_row = ws_results.row_values(1)
-                        new_row = []
-                        for col_name in header_row:
-                            col_str = str(col_name)
-                            if col_str == '시험명': new_row.append(selected_test) # 🌟 시험명 자동 저장!
-                            elif col_str == '이름': new_row.append(clean_name)
-                            elif col_str == '학교': new_row.append(input_school)
-                            elif col_str == '학년': new_row.append(input_grade)
-                            elif col_str in answers: new_row.append(answers[col_str])
-                            else: new_row.append("")
-                        
-                        ws_results.append_row(new_row)
-                        st.success(f"✅ '{clean_name}' 학생의 [{selected_test}] 성적이 구글 시트에 실시간으로 저장되었습니다!")
-                        st.balloons()
-                    except Exception as e:
-                        st.error(f"저장 중 오류가 발생했습니다: {e}")
-
-with tab2:
-    st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
-    target_student = st.text_input("리포트를 출력할 학생 이름:", placeholder="예: 홍길동")
-    
-    if st.button("PDF 리포트 생성", type="primary"):
-        clean_target_name = target_student.strip()
-        if not clean_target_name:
-            st.warning("⚠️ 학생 이름을 먼저 입력해주세요.")
-        else:
-            with st.spinner(f"[{selected_test}] 데이터를 분석하고 리포트를 그리는 중입니다..."):
-                success, pdf_buffer, message = generate_jeet_expert_report(clean_target_name, selected_test)
-                
-                if success:
-                    st.success(message)
-                    st.download_button(
-                        label="📥 PDF 리포트 파일 다운로드",
-                        data=pdf_buffer.getvalue(),
-                        file_name=f"{clean_target_name}_{selected_test}_리포트.pdf",
-                        mime="application/pdf"
-                    )
-                else:
-                    st.error(message)
