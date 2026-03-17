@@ -60,7 +60,6 @@ def load_data():
     df_results = df_results.replace('', 0).fillna(0)
     return doc, ws_info, ws_results, df_info, df_results
 
-# --- 3. PDF 생성 함수 (원장님 오리지널 + 시험 필터링 추가) ---
 # --- 3. PDF 생성 함수 (원장님 오리지널 + 시험 필터링 + 단원 자동 인식 추가) ---
 def generate_jeet_expert_report(target_name, selected_test):
     try:
