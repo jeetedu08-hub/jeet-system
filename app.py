@@ -13,7 +13,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import io
 import json
 
-# --- 1. 환경 및 폰트 설정 (클라우드 호환 강제 주입) ---
+# --- 1. 환경 및 폰트 설정 ---
 font_path = "malgun.ttf"
 if os.path.exists(font_path):
     fm.fontManager.addfont(font_path)
@@ -27,12 +27,10 @@ plt.rcParams['axes.unicode_minus'] = False
 COLOR_NAVY = '#1A237E'; COLOR_RED = '#D32F2F'; COLOR_STUDENT = '#0056B3'
 COLOR_AVG = '#757575'; COLOR_GRID = '#E0E0E0'; COLOR_BG = '#F8F9FA'
 
-# --- 2. 구글 스프레드시트 연동 함수 ---
+# --- 2. 구글 스프레드시트 연동 및 캐시 설정 ---
 @st.cache_resource
 def get_google_sheet():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    
-    # 🚨 클라우드 비밀 금고 기능 (원장님이 어떤 이름으로 저장하셨든 다 찾아냅니다!)
     if "GOOGLE_JSON" in st.secrets:
         creds_dict = json.loads(st.secrets["GOOGLE_JSON"])
     elif "gcp_secret_string" in st.secrets:
@@ -44,35 +42,36 @@ def get_google_sheet():
         
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    
-    # 🚨 이름이 바뀌어도 무조건 찾아가도록 URL 방식으로 고정
     doc = client.open_by_url("https://docs.google.com/spreadsheets/d/1bYv3ff5xwzd4DS3EZUC9Xj6GSpeVmijobbW0svKpqXU/edit")
     return doc
+
+# 🚨 [핵심 해결 포인트] 구글에 매번 묻지 않도록 데이터를 2분간 기억(캐시)합니다!
+@st.cache_data(ttl=120)
+def fetch_all_dataframes():
+    doc = get_google_sheet()
+    df_info = pd.DataFrame(doc.worksheet('Test_Info').get_all_records())
+    df_results = pd.DataFrame(doc.worksheet('Student_Results').get_all_records())
+    df_results = df_results.replace('', 0).fillna(0)
+    return df_info, df_results
 
 def load_data():
     doc = get_google_sheet()
     ws_info = doc.worksheet('Test_Info')
     ws_results = doc.worksheet('Student_Results')
-    
-    df_info = pd.DataFrame(ws_info.get_all_records())
-    df_results = pd.DataFrame(ws_results.get_all_records())
-    
-    df_results = df_results.replace('', 0).fillna(0)
+    df_info, df_results = fetch_all_dataframes()
     return doc, ws_info, ws_results, df_info, df_results
 
-# --- 3. PDF 생성 함수 (원장님 오리지널 + 시험 필터링 + 단원 자동 인식 추가) ---
+# --- 3. PDF 생성 함수 ---
 def generate_jeet_expert_report(target_name, selected_test):
     try:
         _, _, _, df_info, df_results = load_data()
         
-        # 🌟 여기서 선택한 시험('1학년 1학기' 등)의 데이터만 싹 골라냅니다!
         df_info = df_info[df_info['시험명'] == selected_test]
         df_results = df_results[df_results['시험명'] == selected_test]
         
         df_results.columns = df_results.columns.astype(str)
         df_info['배점'] = df_info['배점'].replace('', 3).fillna(3).astype(int)
         
-        # 🚨 [핵심 해결 포인트] 하드코딩된 단원명 삭제! 구글 시트에 적힌 단원명 그대로 자동 인식!
         unit_order = df_info['단원'].drop_duplicates().tolist()
   
         q_cols = [str(q) for q in df_info['문항번호']]
@@ -175,7 +174,6 @@ def generate_jeet_expert_report(target_name, selected_test):
                 ax2.set_xticks(x_pos)
                 ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
                 
-                # 🚨 [추가 안전장치] 데이터가 비어있어도 에러(NaN)가 나지 않도록 방어막 추가!
                 max_val = unit_data['배점'].max()
                 max_val = 10 if pd.isna(max_val) or max_val == 0 else max_val
                 ax2.set_ylim(0, max_val * 1.5)
@@ -284,7 +282,7 @@ with tab1:
             col1, col2, col3 = st.columns(3)
             with col1: input_name = st.text_input("이름")
             with col2: input_school = st.text_input("학교")
-            with col3: input_grade = st.selectbox("학년", ["중1", "중2", "중3"]) # 원장님 오리지널 폼!
+            with col3: input_grade = st.selectbox("학년", ["중1", "중2", "중3"])
                 
             st.markdown("---")
             st.write("**문항별 정답 입력 (1: 정답, 0: 오답)**")
@@ -293,7 +291,6 @@ with tab1:
             answers = {}
             for i, q_num in enumerate(question_numbers):
                 with cols[i % 5]:
-                    # 원장님 오리지널 넘버 인풋 방식 복구!
                     answers[str(q_num)] = st.number_input(f"{q_num}번 문항", min_value=0, max_value=1, step=1)
                     
             submit_btn = st.form_submit_button("구글 시트에 성적 저장하기", type="primary")
@@ -308,7 +305,7 @@ with tab1:
                         new_row = []
                         for col_name in header_row:
                             col_str = str(col_name)
-                            if col_str == '시험명': new_row.append(selected_test) # 🌟 시험명 자동 저장!
+                            if col_str == '시험명': new_row.append(selected_test) 
                             elif col_str == '이름': new_row.append(clean_name)
                             elif col_str == '학교': new_row.append(input_school)
                             elif col_str == '학년': new_row.append(input_grade)
@@ -318,6 +315,9 @@ with tab1:
                         ws_results.append_row(new_row)
                         st.success(f"✅ '{clean_name}' 학생의 [{selected_test}] 성적이 구글 시트에 실시간으로 저장되었습니다!")
                         st.balloons()
+                        
+                        # 🚨 성적을 저장한 후에는 기억(캐시)을 지워서 새 점수가 바로 반영되게 합니다!
+                        fetch_all_dataframes.clear()
                     except Exception as e:
                         st.error(f"저장 중 오류가 발생했습니다: {e}")
 
