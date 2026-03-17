@@ -45,7 +45,6 @@ def get_google_sheet():
     doc = client.open_by_url("https://docs.google.com/spreadsheets/d/1bYv3ff5xwzd4DS3EZUC9Xj6GSpeVmijobbW0svKpqXU/edit")
     return doc
 
-# 🚨 속도 제한 방지 캐시
 @st.cache_data(ttl=120)
 def fetch_all_dataframes():
     doc = get_google_sheet()
@@ -118,19 +117,27 @@ def generate_jeet_expert_report(target_name, selected_test):
                 border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
                 fig.patches.append(border)
                 
+                # 🌟 [로고 위치 수정] 겹치지 않게 더 위로 올리기
                 if os.path.exists("logo.png"):
                     logo_img = plt.imread("logo.png")
-                    logo_ax = fig.add_axes([0.80, 0.88, 0.15, 0.08], zorder=15)
+                    # y위치(두 번째 값)를 0.88에서 0.92로 올려 제목과 겹침 방지
+                    logo_ax = fig.add_axes([0.80, 0.92, 0.15, 0.08], zorder=15)
                     logo_ax.imshow(logo_img)
                     logo_ax.axis('off')
 
-                fig.text(0.31, 0.92, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
-                fig.text(0.33, 0.92, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
+                # 🌟 [제목 및 내용 위치 수정] 로고 아래로 조금씩 내리기
+                # JEET 제목 y위치를 0.88에서 0.86으로 살짝 내리기
+                fig.text(0.31, 0.86, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
+                # 분석 리포트 제목 y위치를 0.88에서 0.86으로 살짝 내리기
+                fig.text(0.33, 0.86, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
                 
-                info_text = f"[{selected_test}] 중등 수학 교육원 {student_name} 학생 심층 분석"
-                fig.text(0.5, 0.88, info_text, ha='center', fontsize=15, fontweight='bold', color='#222')
+                # 🌟 [학생 정보 표기 수정 및 위치 조정] y위치를 0.84에서 0.82로 내리기
+                # 사용자가 요청한 스키마(학교 / 학년 / 이름 / 시험 과정)대로 정보 구성
+                info_text = f"과정: {selected_test}  |  학교: {s_row.get('학교', '')}  |  학년: {student_grade}  |  이름: {student_name}"
+                fig.text(0.5, 0.82, info_text, ha='center', fontsize=15, fontweight='bold', color='#222')
   
-                ax1 = fig.add_axes([0.10, 0.58, 0.32, 0.22], polar=True)
+                # 그래프 및 하단 진단 내용의 y좌표들도 겹치지 않게 조금씩 내렸습니다.
+                ax1 = fig.add_axes([0.10, 0.50, 0.32, 0.22], polar=True)
                 all_cats = cat_ratio.index.tolist()
                 ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
                 s_ordered = cat_ratio.reindex(ordered_labels)
@@ -175,17 +182,13 @@ def generate_jeet_expert_report(target_name, selected_test):
                 ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
                 ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
   
-                ax2 = fig.add_axes([0.55, 0.58, 0.35, 0.20])
+                ax2 = fig.add_axes([0.55, 0.50, 0.35, 0.20])
                 x_pos = np.arange(len(unit_data))
                 bars = ax2.bar(x_pos, unit_data['득점'], color=COLOR_STUDENT, alpha=0.8, width=0.5, zorder=3)
                 ax2.scatter(x_pos, unit_avg_data['평균득점'], color=COLOR_RED, marker='_', s=1000, linewidth=3, zorder=4)
                 ax2.set_xticks(x_pos)
                 ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
-                
-                max_val = unit_data['배점'].max()
-                max_val = 10 if pd.isna(max_val) or max_val == 0 else max_val
-                ax2.set_ylim(0, max_val * 1.5)
-                
+                ax2.set_ylim(0, unit_data['배점'].max() * 1.5)
                 ax2.set_title("▶ 단원별 성취도", pad=15, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
   
@@ -194,11 +197,11 @@ def generate_jeet_expert_report(target_name, selected_test):
                     ax2.text(bar.get_x() + bar.get_width()/2, s_v + 0.5, f"{s_v}", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT)
                     ax2.text(bar.get_x() + bar.get_width()/2, s_v + 0.5, f" ({a_v})", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED)
   
-                rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
+                rect_diag = plt.Rectangle((0.08, 0.13), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
-                fig.text(0.11, 0.44, "▶ ", fontsize=15, fontweight='bold', color=COLOR_NAVY)
-                fig.text(0.13, 0.44, " JEET", fontsize=15, fontweight='bold', color=COLOR_RED)
-                fig.text(0.185, 0.44, f"   중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=15, fontweight='bold', color=COLOR_NAVY)
+                fig.text(0.11, 0.42, "▶ ", fontsize=15, fontweight='bold', color=COLOR_NAVY)
+                fig.text(0.13, 0.42, " JEET", fontsize=15, fontweight='bold', color=COLOR_RED)
+                fig.text(0.185, 0.42, f"   중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=15, fontweight='bold', color=COLOR_NAVY)
                 
                 avg_val, total_avg_val = int(cat_ratio.mean()), int(avg_cat_ratio.mean())
                 diff_val = avg_val - total_avg_val
@@ -230,22 +233,22 @@ def generate_jeet_expert_report(target_name, selected_test):
                 )
                 
                 wrapped_lines = [textwrap.fill(p, width=54) for p in diag_content.split('\n\n')]
-                fig.text(0.11, 0.41, "\n\n".join(wrapped_lines), fontsize=10.5, linespacing=1.8, va='top', ha='left', color='#333')
+                fig.text(0.11, 0.39, "\n\n".join(wrapped_lines), fontsize=10.5, linespacing=1.8, va='top', ha='left', color='#333')
   
-                line_footer = plt.Line2D([0.05, 0.95], [0.12, 0.12], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure)
+                line_footer = plt.Line2D([0.05, 0.95], [0.10, 0.10], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure)
                 fig.lines.append(line_footer)
                 campuses = [("수지 캠퍼스: 276-8003", "풍덕천로 129번길 16-1"), ("죽전 캠퍼스: 263-8003", "기흥구 죽현로 29"), ("광교 캠퍼스: 257-8003", "영통구 혜명로 10")]
                 for i, (name, addr) in enumerate(campuses):
-                    fig.text([0.22, 0.50, 0.78][i], 0.08, name, ha='center', fontsize=10, fontweight='bold', color=COLOR_NAVY)
-                    fig.text([0.22, 0.50, 0.78][i], 0.05, addr, ha='center', fontsize=7.5, color='#555')
+                    fig.text([0.22, 0.50, 0.78][i], 0.06, name, ha='center', fontsize=10, fontweight='bold', color=COLOR_NAVY)
+                    fig.text([0.22, 0.50, 0.78][i], 0.03, addr, ha='center', fontsize=7.5, color='#555')
   
                 pdf.savefig(fig)
                 plt.close(fig)
             
         if not student_found:
-            return False, None, f"선택한 과정({selected_test})에서 '{target_name}' 학생을 찾을 수 없습니다."
+            return False, None, f"'{target_name}' 학생을 찾을 수 없습니다."
             
-        return True, pdf_buffer, f"'{target_name}' 학생의 [{selected_test}] 심층 분석 리포트가 성공적으로 생성되었습니다!"
+        return True, pdf_buffer, f"'{target_name}' 학생의 심층 분석 리포트가 성공적으로 생성되었습니다!"
   
     except Exception as e:
         error_msg = traceback.format_exc()
@@ -258,7 +261,7 @@ st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", pag
 st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
 
 try:
-    doc, ws_info, ws_results, df_info_all, df_results_all = load_data()
+    doc, ws_info, ws_results, df_info, df_results = load_data()
 except Exception as e:
     st.error(f"구글 시트를 불러오는 데 실패했습니다. 에러 내용: {e}")
     st.stop()
@@ -267,27 +270,12 @@ except Exception as e:
 # 🌟 추가된 기능: 사이드바 시험 과정 선택
 # ==========================================
 st.sidebar.header("📚 시험 과정 선택")
-
-# 🚨 [새로 추가한 기능!] 파이썬의 기억력을 날려버리는 강력한 동기화 버튼!
-if st.sidebar.button("🔄 구글 시트 데이터 최신화", type="primary", use_container_width=True):
-    fetch_all_dataframes.clear()
-    st.rerun()
-st.sidebar.markdown("---")
-
-if '시험명' not in df_info_all.columns:
-    st.error("구글 시트 Test_Info 시트 A열에 '시험명'을 추가해주세요.")
-    st.stop()
-
-# 🚨 혹시 구글 시트에 빈칸이 있어도 무시하고 진짜 시험지 이름만 싹싹 긁어오도록 수정!
-test_list = [str(t) for t in df_info_all['시험명'].unique() if str(t).strip() != '']
-
-if not test_list:
-    st.sidebar.warning("구글 시트에 입력된 시험 정보가 없습니다.")
-    st.stop()
-
+test_list = df_info['시험명'].unique().tolist()
 selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
 
-df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
+df_info_filtered = df_info[df_info['시험명'] == selected_test]
+df_results_filtered = df_results[df_results['시험명'] == selected_test]
+
 st.sidebar.success(f"✅ 현재 [ {selected_test} ] 모드입니다.")
 
 tab1, tab2 = st.tabs(["📝 신규 성적 입력", "📑 개별 리포트 출력"])
@@ -312,33 +300,22 @@ with tab1:
             answers = {}
             for i, q_num in enumerate(question_numbers):
                 with cols[i % 5]:
-                    answers[str(q_num)] = st.number_input(f"{q_num}번 문항", min_value=0, max_value=1, step=1)
+                    answers[str(q_num)] = st.number_input(f"{q_num}번 문항", min_value=0, max_value=1, step=1, value=0)
                     
             submit_btn = st.form_submit_button("구글 시트에 성적 저장하기", type="primary")
             
             if submit_btn:
-                clean_name = input_name.strip()
-                if not clean_name:
+                if not input_name.strip():
                     st.error("⚠️ 학생 이름을 입력해주세요.")
                 else:
                     try:
-                        header_row = ws_results.row_values(1)
-                        new_row = []
-                        for col_name in header_row:
-                            col_str = str(col_name)
-                            if col_str == '시험명': new_row.append(selected_test) 
-                            elif col_str == '이름': new_row.append(clean_name)
-                            elif col_str == '학교': new_row.append(input_school)
-                            elif col_str == '학년': new_row.append(input_grade)
-                            elif col_str in answers: new_row.append(answers[col_str])
-                            else: new_row.append("")
+                        new_row = [selected_test, input_name.strip(), input_school.strip(), input_grade]
+                        for q_num in question_numbers:
+                            new_row.append(answers[str(q_num)])
                         
                         ws_results.append_row(new_row)
-                        st.success(f"✅ '{clean_name}' 학생의 [{selected_test}] 성적이 구글 시트에 실시간으로 저장되었습니다!")
+                        st.success(f"✅ '{input_name.strip()}' 학생의 성적이 구글 시트에 실시간으로 저장되었습니다!")
                         st.balloons()
-                        
-                        # 🚨 성적 저장 후 캐시 비우기
-                        fetch_all_dataframes.clear()
                     except Exception as e:
                         st.error(f"저장 중 오류가 발생했습니다: {e}")
 
@@ -347,19 +324,18 @@ with tab2:
     target_student = st.text_input("리포트를 출력할 학생 이름:", placeholder="예: 홍길동")
     
     if st.button("PDF 리포트 생성", type="primary"):
-        clean_target_name = target_student.strip()
-        if not clean_target_name:
+        if not target_student.strip():
             st.warning("⚠️ 학생 이름을 먼저 입력해주세요.")
         else:
             with st.spinner(f"[{selected_test}] 데이터를 분석하고 리포트를 그리는 중입니다..."):
-                success, pdf_buffer, message = generate_jeet_expert_report(clean_target_name, selected_test)
+                success, pdf_buffer, message = generate_jeet_expert_report(target_student, selected_test)
                 
                 if success:
                     st.success(message)
                     st.download_button(
                         label="📥 PDF 리포트 파일 다운로드",
                         data=pdf_buffer.getvalue(),
-                        file_name=f"{clean_target_name}_{selected_test}_리포트.pdf",
+                        file_name=f"{target_student}_{selected_test}_리포트.pdf",
                         mime="application/pdf"
                     )
                 else:
