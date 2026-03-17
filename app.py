@@ -1,21 +1,54 @@
 import streamlit as st
 import pandas as pd
-from streamlit_gsheets import GSheetsConnection
+import json
+import gspread
 
 # 1. 페이지 기본 설정
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide")
 st.title("JEET 죽전캠퍼스 성적 통합 관리 시스템 📊")
 
-# 구글 시트 주소
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1bYv3ff5xwzd4DS3EZUC9Xj6GSpeVmijobbW0svKpqXU/edit"
 
-# 2. 구글 시트 연결 (이제 파이썬이 스스로 금고를 열고 출입증을 챙깁니다!)
-conn = st.connection("gsheets", type=GSheetsConnection)
-df_info = conn.read(spreadsheet=SHEET_URL, worksheet="Test_Info")
-df_results = conn.read(spreadsheet=SHEET_URL, worksheet="Student_Results")
+# ==========================================
+# 🚨 철통보안 출입증 확인 (원장님이 저장하신 Secrets 위치 자동 추적!)
+# ==========================================
+def get_credentials():
+    if "GOOGLE_JSON" in st.secrets:
+        return st.secrets["GOOGLE_JSON"]
+    elif "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+        return st.secrets["connections"]["gsheets"].get("credentials", "")
+    return None
 
 # ==========================================
-# 🌟 [핵심 기능] 사이드바: 시험 과정 선택
+# 🚀 핵심 엔진(gspread)으로 데이터 불러오기 (캐시 적용으로 초고속!)
+# ==========================================
+@st.cache_data(ttl=60)
+def load_data():
+    raw_json = get_credentials()
+    if not raw_json:
+        st.error("비밀 금고(Secrets)에 출입증 세팅이 안 되어 있습니다.")
+        st.stop()
+        
+    # 출입증 들고 구글 시트 당당하게 입장
+    creds_dict = json.loads(raw_json)
+    gc = gspread.service_account_from_dict(creds_dict)
+    sh = gc.open_by_url(SHEET_URL)
+    
+    # 시트 2개 열기
+    df_info = pd.DataFrame(sh.worksheet("Test_Info").get_all_records())
+    df_results = pd.DataFrame(sh.worksheet("Student_Results").get_all_records())
+    
+    return df_info, df_results
+
+# 데이터 세팅
+try:
+    df_info, df_results = load_data()
+except Exception as e:
+    st.error(f"구글 시트 연결 중 오류가 발생했습니다: {e}")
+    st.stop()
+
+# ==========================================
+# 🌟 사이드바: 시험 과정 선택
 # ==========================================
 st.sidebar.header("📚 시험 과정 선택")
 
@@ -58,7 +91,7 @@ with tab1:
         
         for i in range(question_count):
             with cols[i % 5]:
-                q_num = df_info_filtered.iloc[i]['문항번호'] if '문항번호' in df_info_filtered.columns else i+1
+                q_num = str(df_info_filtered.iloc[i]['문항번호']) if '문항번호' in df_info_filtered.columns else str(i+1)
                 score = st.text_input(f"{q_num}번 문항", key=f"q_{i}")
                 scores.append(score)
                 
@@ -70,18 +103,22 @@ with tab1:
             else:
                 new_row = [selected_test, student_name, school, grade] + scores
                 
+                # 빈칸 개수 맞추기
                 columns = df_results.columns.tolist()
                 while len(new_row) < len(columns):
                     new_row.append("")
                 
-                new_df = pd.DataFrame([new_row], columns=columns)
-                updated_df = pd.concat([df_results, new_df], ignore_index=True)
+                # 💡 gspread 엔진을 이용해 맨 아랫줄에 바로 점수 꽂아넣기!
+                raw_json = get_credentials()
+                creds_dict = json.loads(raw_json)
+                gc = gspread.service_account_from_dict(creds_dict)
+                sh = gc.open_by_url(SHEET_URL)
+                ws_results = sh.worksheet("Student_Results")
                 
-                # 쓰기 권한을 이용해 구글 시트 업데이트
-                conn.update(spreadsheet=SHEET_URL, worksheet="Student_Results", data=updated_df)
+                ws_results.append_row(new_row)
                 
                 st.success(f"🎉 {student_name} 학생의 [{selected_test}] 성적이 성공적으로 저장되었습니다!")
-                st.cache_data.clear()
+                load_data.clear() # 다음 검색 시 새 데이터가 반영되도록 캐시 지우기
 
 with tab2:
     st.subheader(f"[{selected_test}] 학생별 분석 리포트 출력")
