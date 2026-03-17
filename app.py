@@ -7,10 +7,15 @@ st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide")
 
 st.title("JEET 죽전캠퍼스 성적 통합 관리 시스템 📊")
 
+# ==========================================
+# 🚨 [수정 필수] 원장님의 구글 시트 주소를 아래 큰따옴표 안에 넣어주세요!
+# ==========================================
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1bYv3ff5xwzd4DS3EZUC9Xj6GSpeVmijobbW0svKpqXU/edit?gid=727156801#gid=727156801"
+
 # 2. 구글 시트 데이터 불러오기
 conn = st.connection("gsheets", type=GSheetsConnection)
-df_info = conn.read(worksheet="Test_Info")
-df_results = conn.read(worksheet="Student_Results")
+df_info = conn.read(spreadsheet=SHEET_URL, worksheet="Test_Info")
+df_results = conn.read(spreadsheet=SHEET_URL, worksheet="Student_Results")
 
 # ==========================================
 # 🌟 [핵심 기능] 사이드바: 시험 과정 선택
@@ -84,7 +89,9 @@ with tab1:
                 # 데이터 합쳐서 구글 시트에 업데이트하기
                 new_df = pd.DataFrame([new_row], columns=columns)
                 updated_df = pd.concat([df_results, new_df], ignore_index=True)
-                conn.update(worksheet="Student_Results", data=updated_df)
+                
+                # 수정: 업데이트할 때도 SHEET_URL을 알려줘야 함
+                conn.update(spreadsheet=SHEET_URL, worksheet="Student_Results", data=updated_df)
                 
                 st.success(f"🎉 {student_name} 학생의 [{selected_test}] 성적이 성공적으로 저장되었습니다!")
                 st.cache_data.clear() # 캐시 지우고 바로 반영
@@ -114,8 +121,7 @@ with tab2:
             
             st.info("💡 모바일 또는 PC에서 이 화면을 캡처하거나, PC 브라우저 우클릭 -> [인쇄] -> [PDF로 저장]을 누르시면 학부모님 전송용 리포트가 완성됩니다!")
             
-            # --- 여기에 원장님이 기존에 쓰시던 세부 분석표나 차트 코드를 넣으시면 됩니다 ---
-            # (기본적으로 학생의 정답/오답 데이터를 보여주는 표 추가)
+            # --- 기본 표 출력 ---
             st.write("### 📝 문항별 결과")
             
             # 성적 데이터만 잘라내기 (1번 문항부터 끝까지)
