@@ -10,7 +10,7 @@ st.title("JEET 죽전캠퍼스 성적 통합 관리 시스템 📊")
 # ==========================================
 # 🚨 [수정 필수] 원장님의 구글 시트 주소를 아래 큰따옴표 안에 넣어주세요!
 # ==========================================
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1bYv3ff5xwzd4DS3EZUC9Xj6GSpeVmijobbW0svKpqXU/edit?gid=727156801#gid=727156801"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1bYv3ff5xwzd4DS3EZUC9Xj6GSpeVmijobbW0svKpqXU/edit"
 
 # 2. 구글 시트 데이터 불러오기
 conn = st.connection("gsheets", type=GSheetsConnection)
