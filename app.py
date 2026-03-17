@@ -45,7 +45,6 @@ def get_google_sheet():
     doc = client.open_by_url("https://docs.google.com/spreadsheets/d/1bYv3ff5xwzd4DS3EZUC9Xj6GSpeVmijobbW0svKpqXU/edit")
     return doc
 
-# 🚨 [핵심 해결 포인트] 구글에 매번 묻지 않도록 데이터를 2분간 기억(캐시)합니다!
 @st.cache_data(ttl=120)
 def fetch_all_dataframes():
     doc = get_google_sheet()
@@ -117,6 +116,15 @@ def generate_jeet_expert_report(target_name, selected_test):
                 
                 border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
                 fig.patches.append(border)
+                
+                # 🌟 [PDF 우측 상단 로고 삽입]
+                if os.path.exists("logo.png"):
+                    logo_img = plt.imread("logo.png")
+                    # x위치, y위치, 너비, 높이 조절 (빨간 테두리 안쪽 우측 상단)
+                    logo_ax = fig.add_axes([0.80, 0.87, 0.15, 0.08], zorder=15)
+                    logo_ax.imshow(logo_img)
+                    logo_ax.axis('off') # 로고 주변의 축(선) 숨기기
+
                 fig.text(0.31, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
                 fig.text(0.33, 0.88, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
                 info_text = f"과정: {selected_test}  |  학교: {s_row.get('학교', '')}  |  학년: {student_grade}  |  이름: {student_name}"
@@ -316,7 +324,6 @@ with tab1:
                         st.success(f"✅ '{clean_name}' 학생의 [{selected_test}] 성적이 구글 시트에 실시간으로 저장되었습니다!")
                         st.balloons()
                         
-                        # 🚨 성적을 저장한 후에는 기억(캐시)을 지워서 새 점수가 바로 반영되게 합니다!
                         fetch_all_dataframes.clear()
                     except Exception as e:
                         st.error(f"저장 중 오류가 발생했습니다: {e}")
