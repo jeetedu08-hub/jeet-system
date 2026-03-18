@@ -42,6 +42,7 @@ def get_google_sheet():
         
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
+    # 실제 스프레드시트 URL로 변경해주세요.
     doc = client.open_by_url("https://docs.google.com/spreadsheets/d/1bYv3ff5xwzd4DS3EZUC9Xj6GSpeVmijobbW0svKpqXU/edit")
     return doc
 
@@ -60,7 +61,7 @@ def load_data():
     df_info, df_results = fetch_all_dataframes()
     return doc, ws_info, ws_results, df_info, df_results
 
-# --- 3. PDF 생성 함수 (기존 로직 유지) ---
+# --- 3. PDF 생성 함수 ---
 def generate_jeet_expert_report(target_name, selected_test):
     try:
         _, _, _, df_info, df_results = load_data()
@@ -117,6 +118,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
                 fig.patches.append(border)
 
+                # 🌟 [수정] 로고 위치를 조금 더 위로 이동 (y=0.88 -> 0.89)
                 if os.path.exists("logo.png"):
                     logo_img = plt.imread("logo.png")
                     logo_ax = fig.add_axes([0.80, 0.89, 0.15, 0.08], zorder=15)
@@ -245,6 +247,7 @@ def generate_jeet_expert_report(target_name, selected_test):
 # ==========================================
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 
+# 🌟 웹 화면 상단 로고 설정
 col1, col2 = st.columns([8, 2])
 with col1:
     st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
@@ -273,39 +276,28 @@ st.sidebar.success(f"✅ 현재 [ {selected_test} ] 모드입니다.")
 
 tab1, tab2 = st.tabs(["📝 신규 성적 입력", "📑 개별 리포트 출력"])
 
-# --- [수정된 tab1: O/X 선택형 입력 방식] ---
 with tab1:
     st.subheader(f"[{selected_test}] 신규 학생 성적 입력")
-    st.info("문항별로 O(정답) 또는 X(오답)를 클릭해주세요.")
+    st.info("입력하신 데이터는 구글 스프레드시트에 실시간으로 저장됩니다.")
     
     question_numbers = df_info_filtered['문항번호'].tolist()
 
     if question_numbers:
         with st.form("data_input_form", clear_on_submit=True):
-            ci1, ci2, ci3 = st.columns(3)
-            with ci1: input_name = st.text_input("이름")
-            with ci2: input_school = st.text_input("학교")
-            with ci3: input_grade = st.selectbox("학년", ["중1", "중2", "중3"])
+            col1, col2, col3 = st.columns(3)
+            with col1: input_name = st.text_input("이름")
+            with col2: input_school = st.text_input("학교")
+            with col3: input_grade = st.selectbox("학년", ["중1", "중2", "중3"])
                 
             st.markdown("---")
-            st.write("**문항별 정오표 체크**")
+            st.write("**문항별 정답 입력 (1: 정답, 0: 오답)**")
             
-            # 5열 그리드로 O/X 라디오 버튼 배치
             cols = st.columns(5)
             answers = {}
             for i, q_num in enumerate(question_numbers):
                 with cols[i % 5]:
-                    # 🌟 1/0 입력 대신 O/X 라디오 버튼 사용
-                    choice = st.radio(
-                        f"**{q_num}번**",
-                        options=["O", "X"],
-                        horizontal=True,
-                        key=f"q_{q_num}"
-                    )
-                    # 내부 저장을 위해 O는 1, X는 0으로 변환
-                    answers[str(q_num)] = 1 if choice == "O" else 0
-            
-            st.markdown("---")
+                    answers[str(q_num)] = st.number_input(f"{q_num}번 문항", min_value=0, max_value=1, step=1)
+                    
             submit_btn = st.form_submit_button("구글 시트에 성적 저장하기", type="primary")
             
             if submit_btn:
@@ -326,14 +318,12 @@ with tab1:
                             else: new_row.append("")
                         
                         ws_results.append_row(new_row)
-                        st.success(f"✅ '{clean_name}' 학생의 성적이 구글 시트에 저장되었습니다!")
+                        st.success(f"✅ '{clean_name}' 학생의 [{selected_test}] 성적이 구글 시트에 실시간으로 저장되었습니다!")
                         st.balloons()
-                        # 데이터 새로고침을 위해 캐시 초기화
-                        st.cache_data.clear()
+                        fetch_all_dataframes.clear()
                     except Exception as e:
                         st.error(f"저장 중 오류가 발생했습니다: {e}")
 
-# --- [tab2: 개별 리포트 출력 로직 유지] ---
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
     target_student = st.text_input("리포트를 출력할 학생 이름:", placeholder="예: 홍길동")
