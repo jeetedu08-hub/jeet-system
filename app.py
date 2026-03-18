@@ -117,14 +117,15 @@ def generate_jeet_expert_report(target_name, selected_test):
                 border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
                 fig.patches.append(border)
 
-                # 🌟 [수정 핵심] 로고 위치를 제목과 겹치지 않게 위로 조정
+                # 🌟 [수정 핵심] 기존 설정을 유지하며 로고 y좌표만 위로 조정하여 제목과 분리
                 if os.path.exists("logo.png"):
                     logo_img = plt.imread("logo.png")
-                    # y좌표를 0.905로 올려서 제목(0.88)과 간격을 둠
+                    # y좌표를 테두리 바로 아래(0.905)로 올리고 높이를 0.05로 줄여 공간 확보
                     logo_ax = fig.add_axes([0.80, 0.905, 0.15, 0.05], zorder=15)
                     logo_ax.imshow(logo_img)
                     logo_ax.axis('off')
 
+                # 제목 텍스트는 기존 위치(0.88) 유지 -> 로고와 겹치지 않음
                 fig.text(0.31, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
                 fig.text(0.33, 0.88, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
                 
@@ -132,7 +133,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 fig.text(0.5, 0.84, info_text, ha='center', fontsize=15, fontweight='bold', color='#222')
   
                 ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
-                # ... (중략: 차트 및 데이터 처리 로직은 동일)
+                # ... (데이터 처리 및 차트 로직은 사용자님 코드와 동일)
                 all_cats = cat_ratio.index.tolist()
                 ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
                 s_ordered = cat_ratio.reindex(ordered_labels)
@@ -248,7 +249,7 @@ def generate_jeet_expert_report(target_name, selected_test):
 # ==========================================
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 
-# (상단 로고 UI)
+# (웹 상단 UI 및 로고 표시)
 col1, col2 = st.columns([8, 2])
 with col1:
     st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
@@ -256,12 +257,14 @@ with col2:
     if os.path.exists("logo.png"):
         st.image("logo.png", use_column_width=False, width=150)
 
+# (구글 시트 로드)
 try:
     doc, ws_info, ws_results, df_info_all, df_results_all = load_data()
 except Exception as e:
     st.error(f"구글 시트를 불러오는 데 실패했습니다. 에러 내용: {e}")
     st.stop()
 
+# (사이드바 시험 과정 선택)
 st.sidebar.header("📚 시험 과정 선택")
 test_list = df_info_all['시험명'].dropna().unique().tolist()
 selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
@@ -269,49 +272,87 @@ selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요
 df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 st.sidebar.success(f"✅ 현재 [ {selected_test} ] 모드입니다.")
 
+# (탭 구성)
 tab1, tab2 = st.tabs(["📝 신규 성적 입력", "📑 개별 리포트 출력"])
 
-# --- [O/X 입력 방식 유지] ---
+# --- [tab1: 기존 O/X 선택형 입력 방식 완벽 유지] ---
 with tab1:
     st.subheader(f"[{selected_test}] 신규 학생 성적 입력")
+    st.info("문항별로 O(정답) 또는 X(오답)를 클릭해주세요.")
+    
     question_numbers = df_info_filtered['문항번호'].tolist()
+
     if question_numbers:
         with st.form("data_input_form", clear_on_submit=True):
             ci1, ci2, ci3 = st.columns(3)
             with ci1: input_name = st.text_input("이름")
             with ci2: input_school = st.text_input("학교")
             with ci3: input_grade = st.selectbox("학년", ["중1", "중2", "중3"])
+                
             st.markdown("---")
+            st.write("**문항별 정오표 체크**")
+            
+            # 5열 그리드로 O/X 라디오 버튼 배치 (기존 설정 유지)
             cols = st.columns(5)
             answers = {}
             for i, q_num in enumerate(question_numbers):
                 with cols[i % 5]:
-                    choice = st.radio(f"**{q_num}번**", options=["O", "X"], horizontal=True, key=f"q_{q_num}")
+                    choice = st.radio(
+                        f"**{q_num}번**",
+                        options=["O", "X"],
+                        horizontal=True,
+                        key=f"q_{q_num}"
+                    )
                     answers[str(q_num)] = 1 if choice == "O" else 0
+            
+            st.markdown("---")
             submit_btn = st.form_submit_button("구글 시트에 성적 저장하기", type="primary")
+            
             if submit_btn:
-                # (시트 저장 로직 동일)
+                # (구글 시트 저장 로직 - 기존 설정 유지)
                 clean_name = input_name.strip()
-                if clean_name:
-                    header_row = ws_results.row_values(1)
-                    new_row = []
-                    for col_name in header_row:
-                        col_str = str(col_name)
-                        if col_str == '시험명': new_row.append(selected_test) 
-                        elif col_str == '이름': new_row.append(clean_name)
-                        elif col_str == '학교': new_row.append(input_school)
-                        elif col_str == '학년': new_row.append(input_grade)
-                        elif col_str in answers: new_row.append(answers[col_str])
-                        else: new_row.append("")
-                    ws_results.append_row(new_row)
-                    st.success(f"✅ 저장되었습니다!")
-                    st.cache_data.clear()
+                if not clean_name:
+                    st.error("⚠️ 학생 이름을 입력해주세요.")
+                else:
+                    try:
+                        header_row = ws_results.row_values(1)
+                        new_row = []
+                        for col_name in header_row:
+                            col_str = str(col_name)
+                            if col_str == '시험명': new_row.append(selected_test) 
+                            elif col_str == '이름': new_row.append(clean_name)
+                            elif col_str == '학교': new_row.append(input_school)
+                            elif col_str == '학년': new_row.append(input_grade)
+                            elif col_str in answers: new_row.append(answers[col_str])
+                            else: new_row.append("")
+                        
+                        ws_results.append_row(new_row)
+                        st.success(f"✅ 저장되었습니다!")
+                        st.balloons()
+                        st.cache_data.clear() # 캐시 초기화
+                    except Exception as e:
+                        st.error(f"저장 중 오류가 발생했습니다: {e}")
 
+# --- [tab2: 기존 리포트 출력 방식 유지] ---
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
-    target_student = st.text_input("리포트를 출력할 학생 이름:")
+    target_student = st.text_input("리포트를 출력할 학생 이름:", placeholder="예: 홍길동")
+    
     if st.button("PDF 리포트 생성", type="primary"):
-        success, pdf_buffer, message = generate_jeet_expert_report(target_student.strip(), selected_test)
-        if success:
-            st.success(message)
-            st.download_button("📥 PDF 다운로드", data=pdf_buffer.getvalue(), file_name=f"{target_student}_{selected_test}_리포트.pdf", mime="application/pdf")
+        clean_target_name = target_student.strip()
+        if not clean_target_name:
+            st.warning("⚠️ 학생 이름을 먼저 입력해주세요.")
+        else:
+            with st.spinner(f"[{selected_test}] 데이터를 분석하고 리포트를 그리는 중입니다..."):
+                success, pdf_buffer, message = generate_jeet_expert_report(clean_target_name, selected_test)
+                
+                if success:
+                    st.success(message)
+                    st.download_button(
+                        label="📥 PDF 다운로드",
+                        data=pdf_buffer.getvalue(),
+                        file_name=f"{clean_target_name}_{selected_test}_리포트.pdf",
+                        mime="application/pdf"
+                    )
+                else:
+                    st.error(message)
