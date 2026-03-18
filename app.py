@@ -300,14 +300,27 @@ with tab1:
             with col3: input_grade = st.selectbox("학년", ["중1", "중2", "중3"])
                 
             st.markdown("---")
-            st.write("**문항별 정답 입력 (1: 정답, 0: 오답)**")
+            st.write("**📝 문항별 정오표 입력 (O: 정답 / X: 오답)**")
             
+            # 5개 열로 나누어 문항 배치
             cols = st.columns(5)
             answers = {}
+            
             for i, q_num in enumerate(question_numbers):
                 with cols[i % 5]:
-                    answers[str(q_num)] = st.number_input(f"{q_num}번 문항", min_value=0, max_value=1, step=1)
-                    
+                    # 라디오 버튼을 사용하여 O, X 선택 (기본값은 X로 설정됨)
+                    # horizontal=True를 설정하면 가로로 배치되어 공간을 절약합니다.
+                    choice = st.radio(
+                        f"**{q_num}번**",
+                        options=["O", "X"],
+                        index=1, # 기본값을 'X'로 설정 (필요시 0으로 바꾸면 'O'가 기본값)
+                        key=f"q_{q_num}",
+                        horizontal=True
+                    )
+                    # 리포트 로직 호환을 위해 O는 1로, X는 0으로 변환
+                    answers[str(q_num)] = 1 if choice == "O" else 0
+            
+            st.markdown("---")
             submit_btn = st.form_submit_button("구글 시트에 성적 저장하기", type="primary")
             
             if submit_btn:
@@ -324,35 +337,13 @@ with tab1:
                             elif col_str == '이름': new_row.append(clean_name)
                             elif col_str == '학교': new_row.append(input_school)
                             elif col_str == '학년': new_row.append(input_grade)
-                            elif col_str in answers: new_row.append(answers[col_str])
+                            elif col_str in answers: new_row.append(answers[col_str]) # 1 또는 0이 들어감
                             else: new_row.append("")
                         
                         ws_results.append_row(new_row)
-                        st.success(f"✅ '{clean_name}' 학생의 [{selected_test}] 성적이 구글 시트에 실시간으로 저장되었습니다!")
+                        st.success(f"✅ '{clean_name}' 학생의 [{selected_test}] 성적이 성공적으로 저장되었습니다!")
                         st.balloons()
+                        # 캐시 갱신
                         fetch_all_dataframes.clear()
                     except Exception as e:
                         st.error(f"저장 중 오류가 발생했습니다: {e}")
-
-with tab2:
-    st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
-    target_student = st.text_input("리포트를 출력할 학생 이름:", placeholder="예: 홍길동")
-    
-    if st.button("PDF 리포트 생성", type="primary"):
-        clean_target_name = target_student.strip()
-        if not clean_target_name:
-            st.warning("⚠️ 학생 이름을 먼저 입력해주세요.")
-        else:
-            with st.spinner(f"[{selected_test}] 데이터를 분석하고 리포트를 그리는 중입니다..."):
-                success, pdf_buffer, message = generate_jeet_expert_report(clean_target_name, selected_test)
-                
-                if success:
-                    st.success(message)
-                    st.download_button(
-                        label="📥 PDF 리포트 파일 다운로드",
-                        data=pdf_buffer.getvalue(),
-                        file_name=f"{clean_target_name}_{selected_test}_리포트.pdf",
-                        mime="application/pdf"
-                    )
-                else:
-                    st.error(message)
