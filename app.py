@@ -64,11 +64,16 @@ def load_data():
 def generate_jeet_expert_report(target_name, selected_test):
     try:
         _, _, _, df_info, df_results = load_data()
-        df_info = df_info[df_info['試験명'] == selected_test]
+        
+        # 🌟 [오타 수정] '試験명' -> '시험명'으로 정상 복구
+        df_info = df_info[df_info['시험명'] == selected_test]
         df_results = df_results[df_results['시험명'] == selected_test]
+        
         df_results.columns = df_results.columns.astype(str)
         df_info['배점'] = df_info['배점'].replace('', 3).fillna(3).astype(int)
+        
         unit_order = df_info['단원'].drop_duplicates().tolist()
+  
         q_cols = [str(q) for q in df_info['문항번호']]
         valid_cols = [col for col in df_results.columns if col in q_cols]
         
@@ -78,22 +83,30 @@ def generate_jeet_expert_report(target_name, selected_test):
 
         df_scores = df_results[valid_cols].applymap(safe_to_int)
         avg_per_q = df_scores.mean()
+        
         total_analysis = df_info.copy()
         total_analysis['평균득점'] = total_analysis['문항번호'].apply(lambda x: avg_per_q.get(str(x), 0))
+        
         avg_cat_ratio = (total_analysis.groupby('영역')['평균득점'].sum() / total_analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
         unit_avg_data = total_analysis.groupby('단원').agg({'평균득점': 'sum'})
         unit_avg_data = unit_avg_data.reindex([u for u in unit_order if u in unit_avg_data.index])
   
         student_found = False
+
         for _, s_row in df_results.iterrows():
             student_name = str(s_row.get('이름', '')).strip()
             if not student_name or student_name == '0': continue
-            if student_name != str(target_name).strip(): continue
+            
+            if student_name != str(target_name).strip():
+                continue
+                
             student_found = True
             student_grade = s_row.get('학년', '')
+            
             analysis = df_info.copy()
             analysis['정답여부'] = [safe_to_int(s_row.get(str(q), 0)) for q in analysis['문항번호']]
             analysis['득점'] = analysis['정답여부'] * analysis['배점']
+            
             cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
             unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
             unit_data = unit_data.reindex([u for u in unit_order if u in unit_data.index])
@@ -101,10 +114,11 @@ def generate_jeet_expert_report(target_name, selected_test):
             pdf_buffer = io.BytesIO()
             with PdfPages(pdf_buffer) as pdf:
                 fig = plt.figure(figsize=(8.27, 11.69))
+                
                 border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
                 fig.patches.append(border)
 
-                # 🌟 [로고 위치] 테두리 바로 밑 최상단 고정 (y=0.915)
+                # 🌟 [로고 위치] 테두리 바로 아래 최상단 유지
                 if os.path.exists("logo.png"):
                     logo_img = plt.imread("logo.png")
                     logo_ax = fig.add_axes([0.80, 0.915, 0.15, 0.045], zorder=15)
@@ -159,7 +173,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f"{sv}", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT)
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f" ({av})", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED)
   
-                # 🌟 [분석 내용 문구 부드럽게 수정]
+                # 🌟 [부드러운 분석 문구 반영]
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
                 fig.text(0.11, 0.44, "▶ ", fontsize=15, fontweight='bold', color=COLOR_NAVY)
@@ -204,7 +218,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 pdf.savefig(fig); plt.close(fig)
             
         if not student_found: return False, None, "학생을 찾을 수 없습니다."
-        return True, pdf_buffer, "리포트가 생성되었습니다!"
+        return True, pdf_buffer, "리포트 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 # --- 4. Streamlit 웹 UI 구성 ---
@@ -263,8 +277,9 @@ with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
     target_student = st.text_input("리포트를 출력할 학생 이름:", placeholder="예: 홍길동")
     if st.button("PDF 리포트 생성", type="primary"):
-        success, buf, msg = generate_jeet_expert_report(target_student.strip(), selected_test)
-        if success:
-            st.success(msg)
-            st.download_button("📥 PDF 다운로드", buf.getvalue(), f"{target_student}_리포트.pdf", "application/pdf")
-        else: st.error(msg)
+        with st.spinner("리포트 그리는 중..."):
+            success, buf, msg = generate_jeet_expert_report(target_student.strip(), selected_test)
+            if success:
+                st.success(msg)
+                st.download_button("📥 PDF 다운로드", buf.getvalue(), f"{target_student}_리포트.pdf", "application/pdf")
+            else: st.error(msg)
