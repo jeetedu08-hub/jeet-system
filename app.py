@@ -60,11 +60,11 @@ def load_data():
     df_info, df_results = fetch_all_dataframes()
     return doc, ws_info, ws_results, df_info, df_results
 
-# --- 3. PDF 생성 함수 (분석 로직 완벽 복구) ---
+# --- 3. PDF 생성 함수 ---
 def generate_jeet_expert_report(target_name, selected_test):
     try:
         _, _, _, df_info, df_results = load_data()
-        df_info = df_info[df_info['시험명'] == selected_test]
+        df_info = df_info[df_info['試験명'] == selected_test]
         df_results = df_results[df_results['시험명'] == selected_test]
         df_results.columns = df_results.columns.astype(str)
         df_info['배점'] = df_info['배점'].replace('', 3).fillna(3).astype(int)
@@ -104,7 +104,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
                 fig.patches.append(border)
 
-                # 🌟 [로고 위치 수정] 테두리 바로 아래 최상단 고정
+                # 🌟 [로고 위치] 테두리 바로 밑 최상단 고정 (y=0.915)
                 if os.path.exists("logo.png"):
                     logo_img = plt.imread("logo.png")
                     logo_ax = fig.add_axes([0.80, 0.915, 0.15, 0.045], zorder=15)
@@ -159,7 +159,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f"{sv}", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT)
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f" ({av})", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED)
   
-                # 🌟 [원본 심층 분석 로직 복구]
+                # 🌟 [분석 내용 문구 부드럽게 수정]
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
                 fig.text(0.11, 0.44, "▶ ", fontsize=15, fontweight='bold', color=COLOR_NAVY)
@@ -174,23 +174,23 @@ def generate_jeet_expert_report(target_name, selected_test):
                 unit_diff = unit_data['득점'] - unit_avg_data['평균득점']
                 worst_unit = unit_diff.idxmin() if not unit_diff.empty else "전반적인"
                 
-                if avg_val >= 90: eval_tier = "최상위권 수준의 탁월한 성취도"
-                elif avg_val >= 75: eval_tier = "기본기가 탄탄한 우수한 성취도"
-                elif avg_val >= 60: eval_tier = "핵심 개념에 대한 보완이 필요한 성취도"
-                else: eval_tier = "전반적인 기초 학습 재점검이 요구되는 성취도"
+                if avg_val >= 90: eval_tier = "심화 개념까지 완벽히 소화하는 탁월한 성취도"
+                elif avg_val >= 75: eval_tier = "성실한 학습 태도가 돋보이는 우수한 성취도"
+                elif avg_val >= 60: eval_tier = "개념을 정립하며 꾸준히 도약 중인 성취도"
+                else: eval_tier = "기초를 다지며 가능성을 키워가는 단계의 성취도"
                 
                 solution_dict = {
-                    '계산력': "매일 일정한 분량의 연산 훈련을 병행하여 잦은 실수를 줄이고 풀이 속도를 높이는 연습을 강력히 권장합니다.",
-                    '이해력': "개념서의 기본 원리와 공식 유도 과정을 스스로 백지에 설명해보는 '백지 복습법'을 통해 뼈대를 튼튼히 해야 합니다.",
-                    '추론력': "조건이 복잡한 심화 문제를 단계별로 끊어 읽고, 출제자의 숨은 의도를 분석 및 도식화하는 훈련이 필요합니다.",
-                    '문제해결력': "다양한 개념이 통합된 융합형 문제 위주로 다루며, 스스로 식을 세우고 끝까지 답을 도출하는 끈기를 길러야 합니다."
+                    '계산력': "꾸준한 연산 연습을 통해 풀이의 정확도와 속도를 높여 나간다면 실전에서 더욱 빛을 발할 것입니다.",
+                    '이해력': "백지에 핵심 개념을 직접 정리해보는 습관을 통해 학습의 뼈대를 더욱 단단하게 만드는 과정이 큰 도움이 될 것입니다.",
+                    '추론력': "어려운 문제도 차근차근 단계별로 분석하며 출제 의도를 파악하는 훈련을 병행하여 사고의 깊이를 더해 가길 권장합니다.",
+                    '문제해결력': "다양한 유형이 복합된 심화 문제를 끝까지 스스로 해결해보는 경험을 통해 수학적 자신감을 한층 높여 나갈 시점입니다."
                 }
-                worst_solution = solution_dict.get(worst_cat, "개인별 맞춤 클리닉을 통해 취약 단원을 집중 공략할 것을 권장합니다.")
+                worst_solution = solution_dict.get(worst_cat, "부족한 부분을 맞춤 클리닉으로 채워 나간다면 충분히 더 큰 도약이 가능합니다.")
 
                 diag_content = (
-                    f"1. 종합 진단: {student_name} 학생은 전체 평균({total_avg_val}%) 대비 {abs(diff_val)}%p {'높은' if diff_val >= 0 else '낮은'} {avg_val}%의 성적을 기록하여 [{eval_tier}]를 보이고 있습니다.\n\n"
-                    f"2. 강약점 분석: 영역별 진단 결과 '{best_cat}' 역량이 가장 돋보이나, 상대적으로 '{worst_cat}' 역량의 보완이 시급합니다. 특히 단원별 성취도에서 '{worst_unit}' 파트의 오답률이 높아 해당 부분의 개념 재점검이 우선되어야 합니다.\n\n"
-                    f"3. JEET 맞춤 솔루션: 단기적으로는 '{worst_unit}' 단원의 오답 노트를 작성하고 유사 유형을 반복 훈련해야 합니다. 중장기적으로 '{worst_cat}'을(를) 끌어올리기 위해 {worst_solution}"
+                    f"1. 종합 진단: {student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다.\n\n"
+                    f"2. 강약점 분석: 영역별 분석 결과 '{best_cat}'에서 뛰어난 역량이 확인되나, 상대적으로 '{worst_cat}' 역량의 보완이 이루어진다면 더 큰 성장이 기대됩니다. 특히 '{worst_unit}' 단원의 핵심 개념을 다시 한번 점검해 볼 필요가 있습니다.\n\n"
+                    f"3. JEET 맞춤 솔루션: 단기적으로는 '{worst_unit}' 단원의 오답 노트를 작성하며 취약 유형에 익숙해지는 시간을 가져야 합니다. 중장기적으로 '{worst_cat}' 역량을 끌어올리기 위해 {worst_solution}"
                 )
                 wrapped_lines = [textwrap.fill(p, width=54) for p in diag_content.split('\n\n')]
                 fig.text(0.11, 0.41, "\n\n".join(wrapped_lines), fontsize=10.5, linespacing=1.8, va='top', ha='left', color='#333')
@@ -204,7 +204,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 pdf.savefig(fig); plt.close(fig)
             
         if not student_found: return False, None, "학생을 찾을 수 없습니다."
-        return True, pdf_buffer, f"'{target_name}' 학생의 리포트가 생성되었습니다!"
+        return True, pdf_buffer, "리포트가 생성되었습니다!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 # --- 4. Streamlit 웹 UI 구성 ---
@@ -263,9 +263,8 @@ with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
     target_student = st.text_input("리포트를 출력할 학생 이름:", placeholder="예: 홍길동")
     if st.button("PDF 리포트 생성", type="primary"):
-        with st.spinner("리포트 그리는 중..."):
-            success, buf, msg = generate_jeet_expert_report(target_student.strip(), selected_test)
-            if success:
-                st.success(msg)
-                st.download_button("📥 PDF 다운로드", buf.getvalue(), f"{target_student}_리포트.pdf", "application/pdf")
-            else: st.error(msg)
+        success, buf, msg = generate_jeet_expert_report(target_student.strip(), selected_test)
+        if success:
+            st.success(msg)
+            st.download_button("📥 PDF 다운로드", buf.getvalue(), f"{target_student}_리포트.pdf", "application/pdf")
+        else: st.error(msg)
