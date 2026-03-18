@@ -209,20 +209,21 @@ with tab1:
             i_grade = col3.selectbox("학년", ["중1", "중2", "중3"])
             
             st.write("---")
-            st.write("📊 문항별 정답 입력 (1: 정답, 0: 오답)")
+            st.write("📊 문항별 정답 입력 (**정답: 1, 오답: 0**)")
             
             ans = {}
-            # --- 수정된 핵심 로직: 행 단위로 컬럼을 생성하여 모바일에서도 순서 유지 ---
+            # --- 수정된 핵심 로직: 5개씩 행 단위로 컬럼 생성 (모바일 순서 유지 + O/X 선택형) ---
             for i in range(0, len(q_nums), 5):
-                cols = st.columns(5) # 5개씩 묶어서 한 줄(Row) 생성
+                cols = st.columns(5)
                 for j in range(5):
                     idx = i + j
                     if idx < len(q_nums):
                         q = q_nums[idx]
                         with cols[j]:
-                            # 원래의 넘버 인풋 방식을 유지합니다.
-                            ans[str(q)] = st.number_input(f"{q}번", 0, 1, 0, key=f"q_{q}")
-            # -----------------------------------------------------------------
+                            # selectbox를 사용하여 0 또는 1만 선택하게 함
+                            val = st.selectbox(f"{q}번", [0, 1], index=0, key=f"q_sel_{selected_test}_{q}")
+                            ans[str(q)] = val
+            # -------------------------------------------------------------------------
             
             st.write("")
             if st.form_submit_button("저장", type="primary"):
