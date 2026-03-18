@@ -12,7 +12,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import io
 import json
-
+  
 # --- 1. 환경 및 폰트 설정 ---
 font_path = "malgun.ttf"
 if os.path.exists(font_path):
@@ -21,12 +21,12 @@ if os.path.exists(font_path):
     plt.rcParams['font.family'] = font_prop.get_name()
 else:
     plt.rcParams['font.family'] = 'Malgun Gothic'
-
+  
 plt.rcParams['axes.unicode_minus'] = False
-
+  
 COLOR_NAVY = '#1A237E'; COLOR_RED = '#D32F2F'; COLOR_STUDENT = '#0056B3'
 COLOR_AVG = '#757575'; COLOR_GRID = '#E0E0E0'; COLOR_BG = '#F8F9FA'
-
+  
 # --- 2. 구글 스프레드시트 연동 및 캐시 설정 ---
 @st.cache_resource
 def get_google_sheet():
@@ -45,7 +45,7 @@ def get_google_sheet():
     client = gspread.authorize(creds)
     doc = client.open_by_url("https://docs.google.com/spreadsheets/d/1bYv3ff5xwzd4DS3EZUC9Xj6GSpeVmijobbW0svKpqXU/edit")
     return doc
-
+  
 @st.cache_data(ttl=120)
 def fetch_all_dataframes():
     doc = get_google_sheet()
@@ -53,14 +53,14 @@ def fetch_all_dataframes():
     df_results = pd.DataFrame(doc.worksheet('Student_Results').get_all_records())
     df_results = df_results.replace('', 0).fillna(0)
     return df_info, df_results
-
+  
 def load_data():
     doc = get_google_sheet()
     ws_info = doc.worksheet('Test_Info')
     ws_results = doc.worksheet('Student_Results')
     df_info, df_results = fetch_all_dataframes()
     return doc, ws_info, ws_results, df_info, df_results
-
+  
 # --- 3. PDF 생성 함수 ---
 def generate_jeet_expert_report(target_name, selected_test):
     try:
@@ -76,7 +76,7 @@ def generate_jeet_expert_report(target_name, selected_test):
         def safe_to_int(val):
             try: return int(float(val))
             except: return 0
-
+  
         df_scores = df_results[valid_cols].applymap(safe_to_int)
         avg_per_q = df_scores.mean()
         total_analysis = df_info.copy()
@@ -84,10 +84,10 @@ def generate_jeet_expert_report(target_name, selected_test):
         avg_cat_ratio = (total_analysis.groupby('영역')['평균득점'].sum() / total_analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
         unit_avg_data = total_analysis.groupby('단원').agg({'평균득점': 'sum'})
         unit_avg_data = unit_avg_data.reindex([u for u in unit_order if u in unit_avg_data.index])
-
+  
         student_found = False
         pdf_buffer = io.BytesIO()
-
+  
         for _, s_row in df_results.iterrows():
             student_name = str(s_row.get('이름', '')).strip()
             if not student_name or student_name == '0' or student_name != str(target_name).strip():
@@ -100,7 +100,7 @@ def generate_jeet_expert_report(target_name, selected_test):
             cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
             unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
             unit_data = unit_data.reindex([u for u in unit_order if u in unit_data.index])
-
+  
             with PdfPages(pdf_buffer) as pdf:
                 fig = plt.figure(figsize=(8.27, 11.69))
                 border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
@@ -109,7 +109,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 fig.text(0.33, 0.88, f'{selected_test} 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
                 info_text = f"과정: {selected_test}  |  학교: {s_row.get('학교', '')}  |  학년: {student_grade}  |  이름: {student_name}"
                 fig.text(0.5, 0.84, info_text, ha='center', fontsize=15, fontweight='bold', color='#222')
-
+  
                 ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
                 all_cats = cat_ratio.index.tolist()
                 ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
@@ -132,7 +132,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                     txt_a = ax1.text(angle, s_val+10, f"({a_val}%)", fontsize=9, fontweight='bold', color=COLOR_RED, ha='left')
                     for t in [txt_s, txt_a]: t.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
                 ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
-
+  
                 ax2 = fig.add_axes([0.55, 0.52, 0.35, 0.20])
                 x_pos = np.arange(len(unit_data))
                 bars = ax2.bar(x_pos, unit_data['득점'], color=COLOR_STUDENT, alpha=0.8, width=0.5, zorder=3)
@@ -143,7 +143,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 for i, bar in enumerate(bars):
                     s_v = int(bar.get_height()); a_v = int(unit_avg_data['평균득점'].iloc[i])
                     ax2.text(bar.get_x() + bar.get_width()/2, s_v + 0.5, f"{s_v}({a_v})", ha='center', va='bottom', fontsize=9, fontweight='bold')
-
+  
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
                 fig.text(0.13, 0.44, " JEET", fontsize=15, fontweight='bold', color=COLOR_RED)
@@ -175,30 +175,27 @@ def generate_jeet_expert_report(target_name, selected_test):
         return True, pdf_buffer, "성공"
     except Exception as e:
         return False, None, traceback.format_exc()
-
+  
 # --- 4. Streamlit 웹 UI ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
-
+  
 c1, c2 = st.columns([8, 2])
 with c1: st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
 with c2: 
     if os.path.exists("logo.png"): st.image("logo.png", width=150)
-
+  
 try:
     doc, ws_info, ws_results, df_info_all, df_results_all = load_data()
 except Exception as e:
     st.error(f"데이터 로드 실패: {e}"); st.stop()
-
+  
 st.sidebar.header("📚 시험 과정 선택")
 test_list = df_info_all['시험명'].dropna().unique().tolist()
 selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
 st.sidebar.success(f"✅ 현재 [ {selected_test} ] 모드")
-
+  
 tab1, tab2 = st.tabs(["📝 신규 성적 입력", "📑 개별 리포트 출력"])
-
-# ==========================================
-# --- 방법 2가 적용된 tab1 부분 ---
-# ==========================================
+  
 with tab1:
     st.subheader(f"[{selected_test}] 신규 학생 성적 입력")
     df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
@@ -212,29 +209,30 @@ with tab1:
             i_grade = col3.selectbox("학년", ["중1", "중2", "중3"])
             
             st.write("---")
-            st.write("📊 **문항별 정답 입력 (1: 정답, 0: 오답)**")
-            st.caption("표 안의 숫자를 클릭하여 수정하세요. (모바일은 옆으로 밀어서 입력)")
+            st.write("📊 문항별 정답 입력 (1: 정답, 0: 오답)")
             
-            # 문항 번호를 컬럼명으로 하는 빈 데이터프레임 생성
-            input_df = pd.DataFrame([[0] * len(q_nums)], columns=[f"{q}번" for q in q_nums])
-            
-            # 데이터 에디터 표시 (가로로 1, 2, 3... 순서 고정)
-            edited_df = st.data_editor(input_df, hide_index=True)
+            ans = {}
+            # --- 수정된 핵심 로직: 행 단위로 컬럼을 생성하여 모바일에서도 순서 유지 ---
+            for i in range(0, len(q_nums), 5):
+                cols = st.columns(5) # 5개씩 묶어서 한 줄(Row) 생성
+                for j in range(5):
+                    idx = i + j
+                    if idx < len(q_nums):
+                        q = q_nums[idx]
+                        with cols[j]:
+                            # 원래의 넘버 인풋 방식을 유지합니다.
+                            ans[str(q)] = st.number_input(f"{q}번", 0, 1, 0, key=f"q_{q}")
+            # -----------------------------------------------------------------
             
             st.write("")
-            submit_btn = st.form_submit_button("💾 성적 데이터 저장", type="primary")
-            
-            if submit_btn:
+            if st.form_submit_button("저장", type="primary"):
                 if not i_name:
-                    st.error("학생 이름을 입력해주세요.")
+                    st.error("이름을 입력해주세요.")
                 else:
-                    # 입력된 데이터프레임에서 첫 번째 행의 값들을 리스트로 추출
-                    ans_values = edited_df.iloc[0].values.tolist()
-                    new_row = [selected_test, i_name, i_school, i_grade] + ans_values
+                    new_row = [selected_test, i_name, i_school, i_grade] + [ans[str(q)] for q in q_nums]
                     ws_results.append_row(new_row)
-                    st.success(f"✅ {i_name} 학생의 성적이 저장되었습니다.")
-                    fetch_all_dataframes.clear()
-
+                    st.success("저장 완료!"); fetch_all_dataframes.clear()
+  
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
     target_name = st.text_input("학생 이름 입력:")
