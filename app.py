@@ -125,11 +125,17 @@ def generate_jeet_expert_report(target_name, selected_test):
                     logo_ax.imshow(logo_img)
                     logo_ax.axis('off')
 
-                fig.text(0.31, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
-                fig.text(0.33, 0.88, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
+                # 🌟 [수정/추가된 부분] 텍스트 객체를 변수에 할당하여 윤곽선(Stroke) 효과를 추가합니다.
+                txt_jeet = fig.text(0.31, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
+                txt_title = fig.text(0.33, 0.88, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
                 
                 info_text = f"학교: {s_row.get('학교', '')}  |  학년: {student_grade}  |  이름: {student_name}  |  과정: {selected_test}"
-                fig.text(0.5, 0.84, info_text, ha='center', fontsize=15, fontweight='bold', color='#222')
+                txt_info = fig.text(0.5, 0.84, info_text, ha='center', fontsize=15, fontweight='bold', color='#222')
+
+                # 한글 폰트에서 fontweight='bold'가 PDF에 렌더링되지 않는 현상을 해결하기 위해 강제로 굵기(Stroke)를 부여합니다.
+                txt_jeet.set_path_effects([path_effects.withStroke(linewidth=2, foreground=COLOR_RED)])
+                txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
+                txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
   
                 ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
                 all_cats = cat_ratio.index.tolist()
