@@ -176,46 +176,49 @@ def generate_jeet_expert_report(target_name, selected_test):
                 title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 fig.text(0.26, 0.49, "(파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=9, color='#555')
   
-                # --- 🌟 단원별 성취도 그래프 (그룹 막대 그래프 수정) ---
+                # --- 단원별 성취도 그래프 (그룹 막대 그래프) ---
                 ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
                 x_pos = np.arange(len(unit_data))
-                bar_width = 0.22 # 막대 너비
+                bar_width = 0.22 
                 
-                # 데이터 % 환산
                 s_pct = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
                 a_pct = (unit_avg_data['평균득점'] / unit_data['배점'] * 100).fillna(0)
                 
-                # 1. 총점 막대 (100% 고정)
-                ax2.bar(x_pos - bar_width, [100] * len(x_pos), color='#B0BEC5', alpha=0.7, width=bar_width, zorder=3, label='단원 만점')
-                # 2. 학생 획득 점수 막대
-                ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3, label='학생 성취율')
-                # 3. 평균 점수 막대
-                ax2.bar(x_pos + bar_width, a_pct, color=COLOR_RED, alpha=0.8, width=bar_width, zorder=3, label='전체 평균')
+                ax2.bar(x_pos - bar_width, [100] * len(x_pos), color='#B0BEC5', alpha=0.7, width=bar_width, zorder=3)
+                ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3)
+                ax2.bar(x_pos + bar_width, a_pct, color=COLOR_RED, alpha=0.8, width=bar_width, zorder=3)
                 
                 ax2.tick_params(axis='x', which='both', length=0) 
                 ax2.set_xticks(x_pos); ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
                 
-                # y축 범위: %이므로 0~125 정도로 여백 확보
                 ax2.set_ylim(0, 130)
-                
                 title2 = ax2.set_title("▶ 단원별 성취도 (%)", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
                 
-                # 범례 하단 이동
                 fig.text(0.725, 0.485, "(회색: 단원 만점(100%) / 파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=8.5, color='#555')
                 
-                # 각 막대 위에 % 수치 표시
+                # 🌟 [수정 부분] 수치가 같을 경우에도 겹치지 않게 높이(y축) 차등화 적용
                 for i in range(len(x_pos)):
-                    # 총점 100% 라벨
-                    t1 = ax2.text(x_pos[i] - bar_width, 102, "100%", ha='center', va='bottom', fontsize=7, fontweight='bold', color='#455A64')
-                    # 학생 % 라벨
-                    t2 = ax2.text(x_pos[i], s_pct.iloc[i] + 2, f"{int(s_pct.iloc[i])}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_STUDENT)
-                    # 평균 % 라벨
-                    t3 = ax2.text(x_pos[i] + bar_width, a_pct.iloc[i] + 2, f"{int(a_pct.iloc[i])}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_RED)
+                    s_val = int(s_pct.iloc[i])
+                    a_val = int(a_pct.iloc[i])
                     
-                    # 가독성을 위한 Stroke 추가
-                    for t in [t1, t2, t3]: t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
+                    # 총점 라벨 (항상 가장 높게 배치)
+                    t1 = ax2.text(x_pos[i] - bar_width, 108, "100%", ha='center', va='bottom', fontsize=7, fontweight='bold', color='#455A64')
+                    
+                    # 학생 점수 라벨 (중간 높이)
+                    t2 = ax2.text(x_pos[i], s_val + 5, f"{s_val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_STUDENT)
+                    
+                    # 평균 점수 라벨 (막대에 가장 가깝게 배치)
+                    # 만약 두 수치 차이가 매우 작다면 평균 라벨을 살짝 더 올리는 보정 로직 추가
+                    a_y_pos = a_val + 2
+                    if abs(s_val - a_val) < 8: # 두 점수가 비슷하거나 같으면
+                        a_y_pos = a_val + 10   # 평균 점수를 학생 점수 위로 더 올림
+                        
+                    t3 = ax2.text(x_pos[i] + bar_width, a_y_pos, f"{a_val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_RED)
+                    
+                    for t in [t1, t2, t3]: 
+                        t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
   
                 # --- 하단 심층 분석 박스 ---
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
@@ -279,7 +282,7 @@ def generate_jeet_expert_report(target_name, selected_test):
         return True, pdf_buffer, "리포트 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
-# --- 4. Streamlit 웹 UI 구성 ---
+# --- 4. Streamlit 웹 UI 구성 (생략/유지) ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 col1, col2 = st.columns([8, 2])
 with col1: st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
