@@ -15,17 +15,21 @@ import json
 
 # --- 1. 환경 및 폰트 설정 ---
 font_path = "NanumSquareR.ttf"
+
+# 🌟 강제로 캐시를 무시하고 폰트를 적용하는 로직 추가
+import matplotlib as mpl
+
 if os.path.exists(font_path):
     fm.fontManager.addfont(font_path)
     font_prop = fm.FontProperties(fname=font_path)
+    # 캐시를 무시하고 직접 폰트 이름 매핑
     plt.rcParams['font.family'] = font_prop.get_name()
+    mpl.rcParams['font.family'] = font_prop.get_name()
 else:
-    plt.rcParams['font.family'] = 'NanumSquareR'
+    plt.rcParams['font.family'] = 'sans-serif' # 폰트를 못 찾았을 때 기본값
+    print("⚠️ 폰트 파일을 찾을 수 없습니다.")
 
 plt.rcParams['axes.unicode_minus'] = False
-  
-COLOR_NAVY = '#1A237E'; COLOR_RED = '#D32F2F'; COLOR_STUDENT = '#0056B3'
-COLOR_AVG = '#757575'; COLOR_GRID = '#E0E0E0'; COLOR_BG = '#F8F9FA'
 
 # --- 2. 구글 스프레드시트 연동 및 캐시 설정 ---
 @st.cache_resource
