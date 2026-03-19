@@ -85,7 +85,7 @@ def generate_jeet_expert_report(target_name, selected_test):
         total_analysis = df_info.copy()
         total_analysis['평균득점'] = total_analysis['문항번호'].apply(lambda x: avg_per_q.get(str(x), 0))
         
-        # 데이터 내의 '문제해결력'을 '문제\n해결력'으로 변환 (그래프용)
+        # '문제해결력'을 '문제\n해결력'으로 변환하여 그래프 겹침 방지
         total_analysis['영역'] = total_analysis['영역'].str.replace('문제해결력', '문제\n해결력')
         
         avg_cat_ratio = (total_analysis.groupby('영역')['평균득점'].sum() / total_analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
@@ -103,9 +103,7 @@ def generate_jeet_expert_report(target_name, selected_test):
             student_grade = s_row.get('학년', '')
             
             analysis = df_info.copy()
-            # 데이터 내의 '문제해결력' 변환
             analysis['영역'] = analysis['영역'].str.replace('문제해결력', '문제\n해결력')
-            
             analysis['정답여부'] = [safe_to_int(s_row.get(str(q), 0)) for q in analysis['문항번호']]
             analysis['득점'] = analysis['정답여부'] * analysis['배점']
             
@@ -136,7 +134,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
                 txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
   
-                # --- 방사형 그래프 ---
+                # --- 방사형 그래프 영역 ---
                 ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
                 all_cats = cat_ratio.index.tolist()
                 ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
@@ -146,31 +144,36 @@ def generate_jeet_expert_report(target_name, selected_test):
                 s_vals = s_ordered.values.tolist() + [s_ordered.values[0]]
                 a_vals = a_ordered.values.tolist() + [a_ordered.values[0]]
                 angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False).tolist() + [0]
+                
                 ax1.set_theta_direction(-1); ax1.set_theta_offset(np.pi/2.0)
                 ax1.plot(angles, a_vals, color=COLOR_AVG, linewidth=1, linestyle='--', label='전체 평균')
                 ax1.fill(angles, a_vals, color=COLOR_AVG, alpha=0.1)
                 ax1.plot(angles, s_vals, color=COLOR_STUDENT, linewidth=2.5, label='학생 점수')
                 ax1.set_ylim(0, 110); ax1.set_xticks(angles[:-1]); ax1.set_xticklabels([]); ax1.set_yticklabels([]) 
+                
+                # 🌟 [수정] 레이블 배치 미세 조정: 겹침 방지를 위해 dist 값을 확장함
                 for i in range(len(labels)):
                     angle = angles[i]; label_text = labels[i]
-                    if angle == 0: ha, va, dist = 'center', 'bottom', 115
-                    elif 0 < angle < np.pi: ha, va, dist = 'left', 'center', 110
-                    elif angle == np.pi: ha, va, dist = 'center', 'top', 115
-                    else: ha, va, dist = 'right', 'center', 110
+                    if angle == 0: ha, va, dist = 'center', 'bottom', 123
+                    elif 0 < angle < np.pi: ha, va, dist = 'left', 'center', 118
+                    elif angle == np.pi: ha, va, dist = 'center', 'top', 123
+                    else: ha, va, dist = 'right', 'center', 118
+                    
                     ax1.text(angle, dist, label_text, fontsize=10, fontweight='bold', va=va, ha=ha, color=COLOR_NAVY)
+                    
                     s_v, a_v = int(s_vals[i]), int(a_vals[i])
-                    td = s_v + 10 if s_v < 85 else s_v - 18
+                    # 수치가 영역명과 겹치지 않도록 위치(td) 조정
+                    td = s_v + 8 if s_v < 85 else s_v - 15
                     txt_s = ax1.text(angle, td, f"{s_v}%", fontsize=9, fontweight='bold', color=COLOR_STUDENT, va='center', ha='right')
                     txt_a = ax1.text(angle, td, f" ({a_v}%)", fontsize=9, fontweight='bold', color=COLOR_RED, va='center', ha='left')
                     for t in [txt_s, txt_a]: t.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
-                ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
                 
+                ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
                 title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
-                
                 fig.text(0.26, 0.49, "(파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=9, color='#555')
   
-                # --- 단원별 성취도 ---
+                # --- 단원별 성취도 영역 ---
                 ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
                 x_pos = np.arange(len(unit_data))
                 bars = ax2.bar(x_pos, unit_data['득점'], color=COLOR_STUDENT, alpha=0.8, width=0.5, zorder=3)
@@ -181,7 +184,6 @@ def generate_jeet_expert_report(target_name, selected_test):
                 
                 title2 = ax2.set_title("▶ 단원별 성취도", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
-                
                 ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
                 ax2.text(0.5, 1.08, "(파란색: 학생 점수 / 빨간색: 전체 평균)", transform=ax2.transAxes, ha='center', fontsize=9, color='#555')
                 
@@ -203,7 +205,6 @@ def generate_jeet_expert_report(target_name, selected_test):
                 
                 avg_val, total_avg_val = int(cat_ratio.mean()), int(avg_cat_ratio.mean())
                 diff_cats = s_ordered - a_ordered
-                # 강약점 분석에서도 줄바꿈된 텍스트가 필요할 경우 그대로 사용
                 best_cat = diff_cats.idxmax() if not diff_cats.empty else "종합"
                 worst_cat = diff_cats.idxmin() if not diff_cats.empty else "종합"
                 unit_diff = unit_data['득점'] - unit_avg_data['평균득점']
@@ -214,7 +215,6 @@ def generate_jeet_expert_report(target_name, selected_test):
                 elif avg_val >= 60: eval_tier = "개념을 정립하며 꾸준히 도약 중인 성취도"
                 else: eval_tier = "기초를 다지며 가능성을 키워가는 단계의 성취도"
                 
-                # 🌟 [수정] 솔루션 키값에 줄바꿈 반영
                 solution_dict = {
                     '계산력': "꾸준한 연산 연습을 통해 풀이의 정확도와 속도를 높여 나간다면 실전에서 더욱 빛을 발할 것입니다.",
                     '이해력': "백지에 핵심 개념을 직접 정리해보는 습관을 통해 학습의 뼈대를 더욱 단단하게 만드는 과정이 큰 도움이 될 것입니다.",
@@ -223,12 +223,8 @@ def generate_jeet_expert_report(target_name, selected_test):
                 }
                 worst_solution = solution_dict.get(worst_cat, "부족한 부분을 맞춤 클리닉으로 채워 나간다면 충분히 더 큰 도약이 가능합니다.")
 
-                # 하단 섹션 구성
                 y_start = 0.415  
                 line_spacing = 0.088 
-                
-                # 텍스트 내에서 줄바꿈된 단어를 다시 보기 좋게 합쳐서 보여주고 싶다면 .replace('\n', '') 사용 가능
-                # 여기서는 그대로(줄바꿈 상태) 혹은 합쳐서 표시할지 선택 가능합니다. 일단 합쳐서 표시하도록 처리했습니다.
                 display_best_cat = best_cat.replace('\n', '')
                 display_worst_cat = worst_cat.replace('\n', '')
 
@@ -258,7 +254,7 @@ def generate_jeet_expert_report(target_name, selected_test):
         return True, pdf_buffer, "리포트 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
-# --- 4. Streamlit 웹 UI 구성 (생략/유지) ---
+# --- 4. Streamlit 웹 UI 구성 ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 col1, col2 = st.columns([8, 2])
 with col1: st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
