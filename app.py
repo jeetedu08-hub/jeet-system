@@ -130,7 +130,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
                 txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
   
-                # --- 방사형 그래프 영역 ---
+                # --- 방사형 그래프 ---
                 ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
                 all_cats = cat_ratio.index.tolist()
                 ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
@@ -159,13 +159,13 @@ def generate_jeet_expert_report(target_name, selected_test):
                     for t in [txt_s, txt_a]: t.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
                 ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
                 
-                # 🌟 [수정] 영역별 지표 타이틀 굵게 적용
+                # 타이틀 굵게
                 title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 
                 fig.text(0.26, 0.49, "(파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=9, color='#555')
   
-                # --- 단원별 성취도 영역 ---
+                # --- 단원별 성취도 ---
                 ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
                 x_pos = np.arange(len(unit_data))
                 bars = ax2.bar(x_pos, unit_data['득점'], color=COLOR_STUDENT, alpha=0.8, width=0.5, zorder=3)
@@ -174,7 +174,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 max_val = unit_data['배점'].max(); max_val = 10 if pd.isna(max_val) or max_val == 0 else max_val
                 ax2.set_ylim(0, max_val * 1.5)
                 
-                # 🌟 [수정] 단원별 성취도 타이틀 굵게 적용
+                # 타이틀 굵게
                 title2 = ax2.set_title("▶ 단원별 성취도", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 
@@ -186,16 +186,14 @@ def generate_jeet_expert_report(target_name, selected_test):
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f"{sv}점", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT)
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f" ({av}점)", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED)
   
-                # --- 하단 심층 분석 영역 ---
+                # --- 하단 심층 분석 박스 ---
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
                 
-                # 🌟 [수정] 심층 분석 타이틀 굵게 적용
+                # 메인 타이틀 굵게
                 t_p1 = fig.text(0.11, 0.44, "▶ ", fontsize=15, fontweight='bold', color=COLOR_NAVY)
-                t_p2 = fig.text(0.13, 0.44, " JEET ", fontsize=15, fontweight='bold', color=COLOR_RED)
-                t_p3 = fig.text(0.185, 0.44, f" 중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=15, fontweight='bold', color=COLOR_NAVY)
-                
-                # 분석 타이틀 텍스트에 굵기 효과 부여
+                t_p2 = fig.text(0.13, 0.44, " JEET", fontsize=15, fontweight='bold', color=COLOR_RED)
+                t_p3 = fig.text(0.185, 0.44, f"   중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=15, fontweight='bold', color=COLOR_NAVY)
                 t_p1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 t_p2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_RED)])
                 t_p3.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
@@ -220,14 +218,30 @@ def generate_jeet_expert_report(target_name, selected_test):
                 }
                 worst_solution = solution_dict.get(worst_cat, "부족한 부분을 맞춤 클리닉으로 채워 나간다면 충분히 더 큰 도약이 가능합니다.")
 
-                diag_content = (
-                    f"1. 종합 진단: {student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다.\n\n"
-                    f"2. 강약점 분석: 영역별 분석 결과 '{best_cat}'에서 뛰어난 역량이 확인되나, 상대적으로 '{worst_cat}' 역량의 보완이 이루어진다면 더 큰 성장이 기대됩니다. 특히 '{worst_unit}' 단원의 핵심 개념을 다시 한번 점검해 볼 필요가 있습니다.\n\n"
-                    f"3. JEET 맞춤 솔루션: 단기적으로는 '{worst_unit}' 단원의 오답 노트를 작성하며 취약 유형에 익숙해지는 시간을 가져야 합니다. 중장기적으로 '{worst_cat}' 역량을 끌어올리기 위해 {worst_solution}"
-                )
-                wrapped_lines = [textwrap.fill(p, width=54) for p in diag_content.split('\n\n')]
-                fig.text(0.11, 0.41, "\n\n".join(wrapped_lines), fontsize=10.5, linespacing=1.8, va='top', ha='left', color='#333')
-  
+                # 🌟 [수정] 소제목을 굵게 처리하고 내용을 개행(밑줄)하여 배치
+                # matplotlib에서 텍스트별로 스타일을 다르게 주려면 각각 따로 그려야 가장 확실합니다.
+                
+                y_start = 0.41  # 분석 내용 시작 높이
+                line_spacing = 0.085 # 섹션 간 간격
+                
+                sections = [
+                    ("1. 종합 진단", f"{student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."),
+                    ("2. 강약점 분석", f"영역별 분석 결과 '{best_cat}'에서 뛰어난 역량이 확인되나, 상대적으로 '{worst_cat}' 역량의 보완이 이루어진다면 더 큰 성장이 기대됩니다. 특히 '{worst_unit}' 단원의 핵심 개념을 다시 한번 점검해 볼 필요가 있습니다."),
+                    ("3. JEET 맞춤 솔루션", f"단기적으로는 '{worst_unit}' 단원의 오답 노트를 작성하며 취약 유형에 익숙해지는 시간을 가져야 합니다. 중장기적으로 '{worst_cat}' 역량을 끌어올리기 위해 {worst_solution}")
+                ]
+
+                curr_y = y_start
+                for subtitle, content in sections:
+                    # 소제목 (굵게 + Stroke)
+                    stxt = fig.text(0.11, curr_y, subtitle, fontsize=11, fontweight='bold', color='#222')
+                    stxt.set_path_effects([path_effects.withStroke(linewidth=0.8, foreground='#222')])
+                    
+                    # 내용 (소제목 바로 밑 줄부터 시작)
+                    wrapped_content = textwrap.fill(content, width=65)
+                    fig.text(0.11, curr_y - 0.018, wrapped_content, fontsize=10, linespacing=1.6, va='top', color='#333')
+                    
+                    curr_y -= line_spacing # 다음 섹션으로 이동
+
                 line_footer = plt.Line2D([0.05, 0.95], [0.12, 0.12], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure)
                 fig.lines.append(line_footer)
                 campuses = [("수지 캠퍼스: 276-8003", "풍덕천로 129번길 16-1"), ("죽전 캠퍼스: 263-8003", "기흥구 죽현로 29"), ("광교 캠퍼스: 257-8003", "영통구 혜명로 10")]
