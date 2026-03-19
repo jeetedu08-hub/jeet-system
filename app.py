@@ -250,11 +250,17 @@ with tab1:
             with ci2: input_school = st.text_input("학교")
             with ci3: input_grade = st.selectbox("학년", ["중1", "중2", "중3"])
             st.markdown("---")
-            cols = st.columns(5); answers = {}
-            for i, q_num in enumerate(question_numbers):
-                with cols[i % 5]:
-                    choice = st.radio(f"**{q_num}번**", options=["O", "X"], horizontal=True, key=f"q_{q_num}")
-                    answers[str(q_num)] = 1 if choice == "O" else 0
+            
+            # --- 수정된 부분: 5문제마다 새로운 행 생성 ---
+            answers = {}
+            for i in range(0, len(question_numbers), 5):
+                cols = st.columns(5)
+                for j, q_num in enumerate(question_numbers[i:i+5]):
+                    with cols[j]:
+                        choice = st.radio(f"**{q_num}번**", options=["O", "X"], horizontal=True, key=f"q_{q_num}")
+                        answers[str(q_num)] = 1 if choice == "O" else 0
+            # ---------------------------------------------
+
             if st.form_submit_button("구글 시트에 성적 저장하기", type="primary"):
                 clean_name = input_name.strip()
                 if not clean_name: st.error("⚠️ 이름을 입력해주세요.")
