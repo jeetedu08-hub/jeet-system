@@ -176,20 +176,22 @@ def generate_jeet_expert_report(target_name, selected_test):
                 title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 fig.text(0.26, 0.49, "(파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=9, color='#555')
   
-                # --- 단원별 성취도 ---
+                # --- 단원별 성취도 영역 ---
+                # 그래프 영역 좌표 [left, bottom, width, height]
                 ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
                 x_pos = np.arange(len(unit_data))
                 
-                # 🌟 [수정] 배경 막대 색상을 더 짙은 회색으로 변경 (#B0BEC5)
+                # 배경 막대 (짙은 회색)
                 ax2.bar(x_pos, unit_data['배점'], color='#B0BEC5', alpha=0.6, width=0.6, zorder=1, label='단원 배점')
                 
-                # 학생 획득 점수 막대 그래프 (zorder를 높여 배경 위에 표시)
+                # 학생 획득 점수 막대 (파란색)
                 bars = ax2.bar(x_pos, unit_data['득점'], color=COLOR_STUDENT, alpha=0.9, width=0.4, zorder=3, label='학생 득점')
                 
-                # 전체 평균 점수 표시선
+                # 전체 평균 점수 표시선 (빨간색)
                 ax2.scatter(x_pos, unit_avg_data['평균득점'], color=COLOR_RED, marker='_', s=1000, linewidth=3, zorder=4, label='전체 평균')
                 
                 ax2.tick_params(axis='x', which='both', length=0) 
+                # 단원명 (x축 레이블) 설정
                 ax2.set_xticks(x_pos); ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
                 
                 max_val = unit_data['배점'].max(); max_val = 10 if pd.isna(max_val) or max_val == 0 else max_val
@@ -201,10 +203,15 @@ def generate_jeet_expert_report(target_name, selected_test):
                 
                 ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
                 
-                # 🌟 [수정] 범례 설명 문구에 만점 정보 추가 및 색상 정보 현행화
-                ax2.text(0.5, 1.08, "(파란 막대: 학생 점수 / 회색 막대: 단원 만점 / 빨간선: 전체 평균)", transform=ax2.transAxes, ha='center', fontsize=9, color='#555')
+                # 🌟 [수정] 범례 설명 문구를 그래프 상단에서 제거하고, 하단(단원명 아래)에 배치
+                # 기존 상단 텍스트 제거: ax2.text(0.5, 1.08, ...) 부분 삭제
                 
-                # 🌟 [수정] 수치 표시 순서 변경 및 배치 최적화 (총점/획득점수/평균점수 순)
+                # 🌟 [추가] 범례 설명 문구를 그래프 하단(단원명 아래)에 배치
+                # fig.text를 사용하여 절대 좌표로 배치 (위치 미세 조정 필요)
+                # 단원명 레이블 높이가 약 0.50~0.51 정도이므로, 그 아래인 0.485로 설정
+                fig.text(0.725, 0.485, "(파란 막대: 학생 점수 / 회색 막대: 단원 만점 / 빨간선: 전체 평균)", ha='center', fontsize=8.5, color='#555')
+                
+                # 수치 표시 순서 최적화 (총점/획득점수/평균점수 순)
                 for i, bar in enumerate(bars):
                     sv = int(bar.get_height())
                     av = int(unit_avg_data['평균득점'].iloc[i])
@@ -215,17 +222,13 @@ def generate_jeet_expert_report(target_name, selected_test):
                     t1 = ax2.text(bar.get_x() + bar.get_width()/2, total_v + 0.5, f"{total_v}점 만점", ha='center', va='bottom', fontsize=9, fontweight='bold', color='#455A64', zorder=5)
                     t1.set_path_effects([path_effects.withStroke(linewidth=2.5, foreground='white')])
                     
-                    # 2. 학생 획득 점수 및 평균 점수 (파란 막대 위)
+                    # 2. 학생 획득 점수 및 평균 점수 (파란 막대 위 중심)
                     # va를 'bottom'으로 설정하고 막대 상단보다 위에 배치
                     t_s = ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f"{sv}점", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT, zorder=5)
                     t_a = ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f" ({av}점)", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED, zorder=5)
                     
                     # 가독성을 위한 흰색 외곽선 효과 유지
                     for t in [t_s, t_a]: t.set_path_effects([path_effects.withStroke(linewidth=2.5, foreground='white')])
-                    
-                    # 🌟 수치가 서로 겹칠 경우를 대비한 미세 조정 로직 (만약 총점과 득점/평균이 너무 가까우면)
-                    # matplotlib는 자동으로 겹침을 완벽하게 방지하지 않으므로, td 값을 조절하는 로직을 추가할 수 있습니다.
-                    # 여기서는 va='bottom'을 일괄 적용하고 total_v 기반 배치를 상향 조정하여 겹침을 최소화했습니다.
   
                 # --- 하단 심층 분석 박스 ---
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
@@ -266,7 +269,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 sections = [
                     ("1. 종합 진단", f"{student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."),
                     ("2. 강약점 분석", f"영역별 분석 결과 '{display_best_cat}'에서 뛰어난 역량이 확인되나, 상대적으로 '{display_worst_cat}' 역량 보완이 이루어진다면 더 큰 성장이 기대됩니다. '{worst_unit}' 단원의 핵심 개념을 다시 점검해 볼 필요가 있습니다."),
-                    ("3. JEET 맞춤 솔루션", f"단기적으로는 '{worst_unit}' 틀린 문제들을 다시 한번 풀어보면서 취약 유형에 익숙해져야 합니다. '{display_worst_cat}' 역량을 위해 {worst_solution}")
+                    ("3. JEET 맞춤 솔루션", f"단기적으로는 '{worst_unit}'는(은) 틀린 문제들을 다시 한번 풀어보면서 취약 유형에 익숙해져야 합니다. '{display_worst_cat}' 역량을 위해 {worst_solution}")
                 ]
 
                 curr_y = y_start
@@ -289,7 +292,7 @@ def generate_jeet_expert_report(target_name, selected_test):
         return True, pdf_buffer, "리포트 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
-# --- 4. Streamlit 웹 UI 구성 ---
+# --- 4. Streamlit 웹 UI 구성 (생략/유지) ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 col1, col2 = st.columns([8, 2])
 with col1: st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
