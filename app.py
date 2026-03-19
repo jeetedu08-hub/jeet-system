@@ -159,6 +159,9 @@ def generate_jeet_expert_report(target_name, selected_test):
                     for t in [txt_s, txt_a]: t.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
                 ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
                 ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
+                
+                # 🌟 [수정/추가된 부분] 방사형 그래프 근처에 수치 의미를 설명하는 문구 추가
+                fig.text(0.26, 0.49, "(파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=9, color='#555')
   
                 ax2 = fig.add_axes([0.55, 0.52, 0.35, 0.20])
                 x_pos = np.arange(len(unit_data))
@@ -168,10 +171,15 @@ def generate_jeet_expert_report(target_name, selected_test):
                 max_val = unit_data['배점'].max(); max_val = 10 if pd.isna(max_val) or max_val == 0 else max_val
                 ax2.set_ylim(0, max_val * 1.5); ax2.set_title("▶ 단원별 성취도", pad=15, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
+                
+                # 🌟 [수정/추가된 부분] 막대 그래프 상단에 수치 의미를 설명하는 문구 추가
+                ax2.text(0.5, 1.03, "(파란색: 학생 점수 / 빨간색: 전체 평균)", transform=ax2.transAxes, ha='center', fontsize=9, color='#555')
+                
                 for i, bar in enumerate(bars):
                     sv, av = int(bar.get_height()), int(unit_avg_data['평균득점'].iloc[i])
-                    ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f"{sv}", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT)
-                    ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f" ({av})", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED)
+                    # 🌟 [수정/추가된 부분] 수치 뒤에 '점' 단위 추가
+                    ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f"{sv}점", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT)
+                    ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f" ({av}점)", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED)
   
                 # 🌟 [부드러운 분석 문구 반영]
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
@@ -251,7 +259,7 @@ with tab1:
             with ci3: input_grade = st.selectbox("학년", ["중1", "중2", "중3"])
             st.markdown("---")
             
-            # --- 수정된 부분: 5문제마다 새로운 행 생성 ---
+            # --- 5문제마다 새로운 행 생성 ---
             answers = {}
             for i in range(0, len(question_numbers), 5):
                 cols = st.columns(5)
