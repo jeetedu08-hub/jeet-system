@@ -84,8 +84,6 @@ def generate_jeet_expert_report(target_name, selected_test):
         
         total_analysis = df_info.copy()
         total_analysis['평균득점'] = total_analysis['문항번호'].apply(lambda x: avg_per_q.get(str(x), 0))
-        
-        # 🌟 '문제해결력'을 '문제\n해결력'으로 변환
         total_analysis['영역'] = total_analysis['영역'].str.replace('문제해결력', '문제\n해결력')
         
         avg_cat_ratio = (total_analysis.groupby('영역')['평균득점'].sum() / total_analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
@@ -104,7 +102,6 @@ def generate_jeet_expert_report(target_name, selected_test):
             
             analysis = df_info.copy()
             analysis['영역'] = analysis['영역'].str.replace('문제해결력', '문제\n해결력')
-            
             analysis['정답여부'] = [safe_to_int(s_row.get(str(q), 0)) for q in analysis['문항번호']]
             analysis['득점'] = analysis['정답여부'] * analysis['배점']
             
@@ -152,26 +149,19 @@ def generate_jeet_expert_report(target_name, selected_test):
                 ax1.plot(angles, s_vals, color=COLOR_STUDENT, linewidth=2.5, label='학생 점수')
                 ax1.set_ylim(0, 110); ax1.set_xticks(angles[:-1]); ax1.set_xticklabels([]); ax1.set_yticklabels([]) 
                 
-                # 🌟 [중요 수정] 문제해결력 겹침 방지를 위해 dist와 정렬 조건을 세밀하게 조정
                 for i in range(len(labels)):
                     angle = angles[i]; label_text = labels[i]
-                    
-                    # 기본 거리 설정
                     if angle == 0: ha, va, dist = 'center', 'bottom', 115
                     elif 0 < angle < np.pi: ha, va, dist = 'left', 'center', 110
                     elif angle == np.pi: ha, va, dist = 'center', 'top', 115
                     else: ha, va, dist = 'right', 'center', 110
                     
-                    # '문제\n해결력'인 경우 바깥으로 더 밀어냄
                     if '문제\n해결력' in label_text:
-                        dist += 10 # 거리를 10만큼 더 벌림
+                        dist += 10
                         ha = 'left' if 0 < angle < np.pi else 'right'
                     
                     ax1.text(angle, dist, label_text, fontsize=10, fontweight='bold', va=va, ha=ha, color=COLOR_NAVY)
-                    
                     s_v, a_v = int(s_vals[i]), int(a_vals[i])
-                    
-                    # 🌟 수치 위치(td)가 레이블과 겹치지 않도록 안쪽으로 살짝 이동
                     if '문제\n해결력' in label_text:
                         td = s_v - 15 if s_v > 30 else s_v + 15
                     else:
@@ -182,10 +172,8 @@ def generate_jeet_expert_report(target_name, selected_test):
                     for t in [txt_s, txt_a]: t.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
                 
                 ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
-                
                 title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
-                
                 fig.text(0.26, 0.49, "(파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=9, color='#555')
   
                 # --- 단원별 성취도 ---
@@ -193,6 +181,10 @@ def generate_jeet_expert_report(target_name, selected_test):
                 x_pos = np.arange(len(unit_data))
                 bars = ax2.bar(x_pos, unit_data['득점'], color=COLOR_STUDENT, alpha=0.8, width=0.5, zorder=3)
                 ax2.scatter(x_pos, unit_avg_data['평균득점'], color=COLOR_RED, marker='_', s=1000, linewidth=3, zorder=4)
+                
+                # 🌟 [수정] x축 눈금선(세로 직선) 안 나오게 설정
+                ax2.tick_params(axis='x', which='both', length=0) 
+                
                 ax2.set_xticks(x_pos); ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
                 max_val = unit_data['배점'].max(); max_val = 10 if pd.isna(max_val) or max_val == 0 else max_val
                 ax2.set_ylim(0, max_val * 1.5)
@@ -214,7 +206,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 
                 t_p1 = fig.text(0.11, 0.44, "▶ ", fontsize=15, fontweight='bold', color=COLOR_NAVY)
                 t_p2 = fig.text(0.13, 0.44, " JEET", fontsize=15, fontweight='bold', color=COLOR_RED)
-                t_p3 = fig.text(0.185, 0.44, f"  중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=15, fontweight='bold', color=COLOR_NAVY)
+                t_p3 = fig.text(0.185, 0.44, f"   중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=15, fontweight='bold', color=COLOR_NAVY)
                 t_p1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 t_p2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_RED)])
                 t_p3.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
