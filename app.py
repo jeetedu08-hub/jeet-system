@@ -72,7 +72,6 @@ def generate_jeet_expert_report(target_name, selected_test):
         df_info['배점'] = df_info['배점'].replace('', 3).fillna(3).astype(int)
         
         unit_order = df_info['단원'].drop_duplicates().tolist()
-
         q_cols = [str(q) for q in df_info['문항번호']]
         valid_cols = [col for col in df_results.columns if col in q_cols]
         
@@ -95,9 +94,7 @@ def generate_jeet_expert_report(target_name, selected_test):
         for _, s_row in df_results.iterrows():
             student_name = str(s_row.get('이름', '')).strip()
             if not student_name or student_name == '0': continue
-            
-            if student_name != str(target_name).strip():
-                continue
+            if student_name != str(target_name).strip(): continue
                 
             student_found = True
             student_grade = s_row.get('학년', '')
@@ -133,6 +130,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
                 txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
   
+                # --- 방사형 그래프 영역 ---
                 ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
                 all_cats = cat_ratio.index.tolist()
                 ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
@@ -160,12 +158,15 @@ def generate_jeet_expert_report(target_name, selected_test):
                     txt_a = ax1.text(angle, td, f" ({a_v}%)", fontsize=9, fontweight='bold', color=COLOR_RED, va='center', ha='left')
                     for t in [txt_s, txt_a]: t.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
                 ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
-                ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
+                
+                # 🌟 [수정] 영역별 지표 타이틀 굵게 적용
+                title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
+                title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 
                 fig.text(0.26, 0.49, "(파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=9, color='#555')
   
-                # 🌟 [수정 부분] ax2의 y축 위치를 0.52에서 0.54로 살짝 올리고, 제목 패딩(pad)을 조절했습니다.
-                ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) # y위치 0.52 -> 0.54 / 높이 0.20 -> 0.18로 조정하여 간격 확보
+                # --- 단원별 성취도 영역 ---
+                ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
                 x_pos = np.arange(len(unit_data))
                 bars = ax2.bar(x_pos, unit_data['득점'], color=COLOR_STUDENT, alpha=0.8, width=0.5, zorder=3)
                 ax2.scatter(x_pos, unit_avg_data['평균득점'], color=COLOR_RED, marker='_', s=1000, linewidth=3, zorder=4)
@@ -173,11 +174,11 @@ def generate_jeet_expert_report(target_name, selected_test):
                 max_val = unit_data['배점'].max(); max_val = 10 if pd.isna(max_val) or max_val == 0 else max_val
                 ax2.set_ylim(0, max_val * 1.5)
                 
-                # 제목과 그래프 사이의 간격을 벌리기 위해 pad를 15에서 25로 늘렸습니다.
-                ax2.set_title("▶ 단원별 성취도", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
-                ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
+                # 🌟 [수정] 단원별 성취도 타이틀 굵게 적용
+                title2 = ax2.set_title("▶ 단원별 성취도", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
+                title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 
-                # (파란색: 학생 점수 / 빨간색: 전체 평균) 텍스트의 위치를 제목 바로 아래로 미세 조정
+                ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
                 ax2.text(0.5, 1.08, "(파란색: 학생 점수 / 빨간색: 전체 평균)", transform=ax2.transAxes, ha='center', fontsize=9, color='#555')
                 
                 for i, bar in enumerate(bars):
@@ -185,14 +186,21 @@ def generate_jeet_expert_report(target_name, selected_test):
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f"{sv}점", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT)
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f" ({av}점)", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED)
   
+                # --- 하단 심층 분석 영역 ---
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
-                fig.text(0.11, 0.44, "▶ ", fontsize=15, fontweight='bold', color=COLOR_NAVY)
-                fig.text(0.13, 0.44, " JEET", fontsize=15, fontweight='bold', color=COLOR_RED)
-                fig.text(0.185, 0.44, f"   중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=15, fontweight='bold', color=COLOR_NAVY)
+                
+                # 🌟 [수정] 심층 분석 타이틀 굵게 적용
+                t_p1 = fig.text(0.11, 0.44, "▶ ", fontsize=15, fontweight='bold', color=COLOR_NAVY)
+                t_p2 = fig.text(0.13, 0.44, " JEET", fontsize=15, fontweight='bold', color=COLOR_RED)
+                t_p3 = fig.text(0.185, 0.44, f"   중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=15, fontweight='bold', color=COLOR_NAVY)
+                
+                # 분석 타이틀 텍스트에 굵기 효과 부여
+                t_p1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
+                t_p2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_RED)])
+                t_p3.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 
                 avg_val, total_avg_val = int(cat_ratio.mean()), int(avg_cat_ratio.mean())
-                diff_val = avg_val - total_avg_val
                 diff_cats = s_ordered - a_ordered
                 best_cat = diff_cats.idxmax() if not diff_cats.empty else "종합"
                 worst_cat = diff_cats.idxmin() if not diff_cats.empty else "종합"
