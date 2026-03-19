@@ -28,7 +28,6 @@ else:
 
 plt.rcParams['axes.unicode_minus'] = False
 
-# 🌟 지워졌던 색상 지정 코드를 다시 복구합니다!
 COLOR_NAVY = '#1A237E'; COLOR_RED = '#D32F2F'; COLOR_STUDENT = '#0056B3'
 COLOR_AVG = '#757575'; COLOR_GRID = '#E0E0E0'; COLOR_BG = '#F8F9FA'
 
@@ -70,7 +69,6 @@ def generate_jeet_expert_report(target_name, selected_test):
     try:
         _, _, _, df_info, df_results = load_data()
         
-        # 🌟 [오타 수정] '試験명' -> '시험명'으로 정상 복구
         df_info = df_info[df_info['시험명'] == selected_test]
         df_results = df_results[df_results['시험명'] == selected_test]
         
@@ -123,24 +121,23 @@ def generate_jeet_expert_report(target_name, selected_test):
                 border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
                 fig.patches.append(border)
 
-                # 🌟 [로고 위치] 테두리 바로 아래 최상단 유지
                 if os.path.exists("logo.png"):
                     logo_img = plt.imread("logo.png")
                     logo_ax = fig.add_axes([0.80, 0.915, 0.15, 0.045], zorder=15)
                     logo_ax.imshow(logo_img)
                     logo_ax.axis('off')
 
-                # 🌟 [수정/추가된 부분] 텍스트 객체를 변수에 할당하여 윤곽선(Stroke) 효과를 추가합니다.
-                txt_jeet = fig.text(0.31, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
-                txt_title = fig.text(0.33, 0.88, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
+                # 🌟 자간을 강제로 넓혀 시원하게 배치
+                txt_jeet = fig.text(0.31, 0.88, 'J E E T', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
+                txt_title = fig.text(0.33, 0.88, '수 학  능 력  분 석  리 포 트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
                 
-                info_text = f"학교: {s_row.get('학교', '')}  |  학년: {student_grade}  |  이름: {student_name}  |  과정: {selected_test}"
-                txt_info = fig.text(0.5, 0.84, info_text, ha='center', fontsize=15, fontweight='bold', color='#222')
+                # 정보란 사이 공간(여백) 확대
+                info_text = f"학교 : {s_row.get('학교', '')}    |    학년 : {student_grade}    |    이름 : {student_name}    |    과정 : {selected_test}"
+                txt_info = fig.text(0.5, 0.84, info_text, ha='center', fontsize=14, fontweight='bold', color='#222')
 
-                # 한글 폰트에서 fontweight='bold'가 PDF에 렌더링되지 않는 현상을 해결하기 위해 강제로 굵기(Stroke)를 부여합니다.
                 txt_jeet.set_path_effects([path_effects.withStroke(linewidth=2, foreground=COLOR_RED)])
                 txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
-                txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
+                txt_info.set_path_effects([path_effects.withStroke(linewidth=0.5, foreground='#222')])
   
                 ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
                 all_cats = cat_ratio.index.tolist()
@@ -169,10 +166,9 @@ def generate_jeet_expert_report(target_name, selected_test):
                     txt_a = ax1.text(angle, td, f" ({a_v}%)", fontsize=9, fontweight='bold', color=COLOR_RED, va='center', ha='left')
                     for t in [txt_s, txt_a]: t.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
                 ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
-                ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
+                ax1.set_title("▶ 영 역 별  핵 심  역 량  지 표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 
-                # 🌟 [수정/추가된 부분] 방사형 그래프 근처에 수치 의미를 설명하는 문구 추가
-                fig.text(0.26, 0.49, "(파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=9, color='#555')
+                fig.text(0.26, 0.49, "( 파란색: 학생 성취율  /  빨간색: 전체 평균 성취율 )", ha='center', fontsize=9, color='#555')
   
                 ax2 = fig.add_axes([0.55, 0.52, 0.35, 0.20])
                 x_pos = np.arange(len(unit_data))
@@ -180,19 +176,16 @@ def generate_jeet_expert_report(target_name, selected_test):
                 ax2.scatter(x_pos, unit_avg_data['평균득점'], color=COLOR_RED, marker='_', s=1000, linewidth=3, zorder=4)
                 ax2.set_xticks(x_pos); ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
                 max_val = unit_data['배점'].max(); max_val = 10 if pd.isna(max_val) or max_val == 0 else max_val
-                ax2.set_ylim(0, max_val * 1.5); ax2.set_title("▶ 단원별 성취도", pad=15, fontsize=14, fontweight='bold', color=COLOR_NAVY)
+                ax2.set_ylim(0, max_val * 1.5); ax2.set_title("▶ 단 원 별  성 취 도", pad=15, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
                 
-                # 🌟 [수정/추가된 부분] 막대 그래프 상단에 수치 의미를 설명하는 문구 추가
-                ax2.text(0.5, 1.03, "(파란색: 학생 점수 / 빨간색: 전체 평균)", transform=ax2.transAxes, ha='center', fontsize=9, color='#555')
+                ax2.text(0.5, 1.03, "( 파란색: 학생 점수  /  빨간색: 전체 평균 )", transform=ax2.transAxes, ha='center', fontsize=9, color='#555')
                 
                 for i, bar in enumerate(bars):
                     sv, av = int(bar.get_height()), int(unit_avg_data['평균득점'].iloc[i])
-                    # 🌟 [수정/추가된 부분] 수치 뒤에 '점' 단위 추가
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f"{sv}점", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT)
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f" ({av}점)", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED)
   
-                # 🌟 [부드러운 분석 문구 반영]
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
                 fig.text(0.11, 0.44, "▶ ", fontsize=15, fontweight='bold', color=COLOR_NAVY)
@@ -225,8 +218,12 @@ def generate_jeet_expert_report(target_name, selected_test):
                     f"2. 강약점 분석: 영역별 분석 결과 '{best_cat}'에서 뛰어난 역량이 확인되나, 상대적으로 '{worst_cat}' 역량의 보완이 이루어진다면 더 큰 성장이 기대됩니다. 특히 '{worst_unit}' 단원의 핵심 개념을 다시 한번 점검해 볼 필요가 있습니다.\n\n"
                     f"3. JEET 맞춤 솔루션: 단기적으로는 '{worst_unit}' 단원의 오답 노트를 작성하며 취약 유형에 익숙해지는 시간을 가져야 합니다. 중장기적으로 '{worst_cat}' 역량을 끌어올리기 위해 {worst_solution}"
                 )
-                wrapped_lines = [textwrap.fill(p, width=54) for p in diag_content.split('\n\n')]
-                fig.text(0.11, 0.41, "\n\n".join(wrapped_lines), fontsize=10.5, linespacing=1.8, va='top', ha='left', color='#333')
+                
+                # 🌟 줄 길이를 54 -> 50으로 줄여 양옆 여백을 늘림
+                wrapped_lines = [textwrap.fill(p, width=50) for p in diag_content.split('\n\n')]
+                
+                # 🌟 줄 간격(linespacing)을 1.8 -> 2.3으로 대폭 넓혀 가독성 향상
+                fig.text(0.11, 0.41, "\n\n".join(wrapped_lines), fontsize=10.5, linespacing=2.3, va='top', ha='left', color='#333')
   
                 line_footer = plt.Line2D([0.05, 0.95], [0.12, 0.12], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure)
                 fig.lines.append(line_footer)
@@ -270,7 +267,6 @@ with tab1:
             with ci3: input_grade = st.selectbox("학년", ["중1", "중2", "중3"])
             st.markdown("---")
             
-            # --- 5문제마다 새로운 행 생성 ---
             answers = {}
             for i in range(0, len(question_numbers), 5):
                 cols = st.columns(5)
@@ -278,7 +274,6 @@ with tab1:
                     with cols[j]:
                         choice = st.radio(f"**{q_num}번**", options=["O", "X"], horizontal=True, key=f"q_{q_num}")
                         answers[str(q_num)] = 1 if choice == "O" else 0
-            # ---------------------------------------------
 
             if st.form_submit_button("구글 시트에 성적 저장하기", type="primary"):
                 clean_name = input_name.strip()
