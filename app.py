@@ -186,7 +186,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f"{sv}점", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT)
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f" ({av}점)", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED)
   
-                # --- 하단 심층 분석 박스 ---
+# --- 하단 심층 분석 박스 ---
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
                 
@@ -218,29 +218,27 @@ def generate_jeet_expert_report(target_name, selected_test):
                 }
                 worst_solution = solution_dict.get(worst_cat, "부족한 부분을 맞춤 클리닉으로 채워 나간다면 충분히 더 큰 도약이 가능합니다.")
 
-                # 🌟 [수정] 소제목을 굵게 처리하고 내용을 개행(밑줄)하여 배치
-                # matplotlib에서 텍스트별로 스타일을 다르게 주려면 각각 따로 그려야 가장 확실합니다.
-                
-                y_start = 0.41  # 분석 내용 시작 높이
-                line_spacing = 0.085 # 섹션 간 간격
+                # 🌟 [수정] 박스 영역을 벗어나지 않도록 너비와 간격 재조정
+                y_start = 0.415  # 시작 높이 살짝 상향
+                line_spacing = 0.088 # 섹션 간 간격 (박스 높이 0.32 내에 3개 섹션 배치)
                 
                 sections = [
                     ("1. 종합 진단", f"{student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."),
-                    ("2. 강약점 분석", f"영역별 분석 결과 '{best_cat}'에서 뛰어난 역량이 확인되나, 상대적으로 '{worst_cat}' 역량의 보완이 이루어진다면 더 큰 성장이 기대됩니다. 특히 '{worst_unit}' 단원의 핵심 개념을 다시 한번 점검해 볼 필요가 있습니다."),
-                    ("3. JEET 맞춤 솔루션", f"단기적으로는 '{worst_unit}' 단원의 오답 노트를 작성하며 취약 유형에 익숙해지는 시간을 가져야 합니다. 중장기적으로 '{worst_cat}' 역량을 끌어올리기 위해 {worst_solution}")
+                    ("2. 강약점 분석", f"영역별 분석 결과 '{best_cat}'에서 뛰어난 역량이 확인되나, 상대적으로 '{worst_cat}' 역량 보완이 이루어진다면 더 큰 성장이 기대됩니다. '{worst_unit}' 단원의 핵심 개념을 다시 점검해 볼 필요가 있습니다."),
+                    ("3. JEET 맞춤 솔루션", f"단기적으로는 '{worst_unit}' 오답 노트를 작성하며 취약 유형에 익숙해져야 합니다. '{worst_cat}' 역량을 위해 {worst_solution}")
                 ]
 
                 curr_y = y_start
                 for subtitle, content in sections:
-                    # 소제목 (굵게 + Stroke)
-                    stxt = fig.text(0.11, curr_y, subtitle, fontsize=11, fontweight='bold', color='#222')
-                    stxt.set_path_effects([path_effects.withStroke(linewidth=0.8, foreground='#222')])
+                    # 소제목
+                    stxt = fig.text(0.11, curr_y, subtitle, fontsize=10.5, fontweight='bold', color='#222')
+                    stxt.set_path_effects([path_effects.withStroke(linewidth=0.6, foreground='#222')])
                     
-                    # 내용 (소제목 바로 밑 줄부터 시작)
-                    wrapped_content = textwrap.fill(content, width=65)
-                    fig.text(0.11, curr_y - 0.018, wrapped_content, fontsize=10, linespacing=1.6, va='top', color='#333')
+                    # 내용 (너비를 58로 줄여 우측 경계 침범 방지)
+                    wrapped_content = textwrap.fill(content, width=58)
+                    fig.text(0.11, curr_y - 0.015, wrapped_content, fontsize=9.5, linespacing=1.5, va='top', color='#333')
                     
-                    curr_y -= line_spacing # 다음 섹션으로 이동
+                    curr_y -= line_spacing
 
                 line_footer = plt.Line2D([0.05, 0.95], [0.12, 0.12], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure)
                 fig.lines.append(line_footer)
