@@ -179,26 +179,35 @@ def generate_jeet_expert_report(target_name, selected_test):
                 # --- 단원별 성취도 ---
                 ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
                 x_pos = np.arange(len(unit_data))
-                bars = ax2.bar(x_pos, unit_data['득점'], color=COLOR_STUDENT, alpha=0.8, width=0.5, zorder=3)
-                ax2.scatter(x_pos, unit_avg_data['평균득점'], color=COLOR_RED, marker='_', s=1000, linewidth=3, zorder=4)
                 
-                # 🌟 [수정] x축 눈금선(세로 직선) 안 나오게 설정
+                # 🌟 [수정] 배경 막대 그래프 (단원별 배점) 추가
+                ax2.bar(x_pos, unit_data['배점'], color='#E0E0E0', alpha=0.5, width=0.6, zorder=1, label='단원 배점')
+                
+                # 학생 획득 점수 막대 그래프 (zorder를 높여 배경 위에 표시)
+                bars = ax2.bar(x_pos, unit_data['득점'], color=COLOR_STUDENT, alpha=0.9, width=0.4, zorder=3, label='학생 득점')
+                
+                # 전체 평균 점수 표시선
+                ax2.scatter(x_pos, unit_avg_data['평균득점'], color=COLOR_RED, marker='_', s=1000, linewidth=3, zorder=4, label='전체 평균')
+                
                 ax2.tick_params(axis='x', which='both', length=0) 
-                
                 ax2.set_xticks(x_pos); ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
+                
                 max_val = unit_data['배점'].max(); max_val = 10 if pd.isna(max_val) or max_val == 0 else max_val
-                ax2.set_ylim(0, max_val * 1.5)
+                # y축 범위를 만점의 1.2배 정도로 설정
+                ax2.set_ylim(0, max_val * 1.2)
                 
                 title2 = ax2.set_title("▶ 단원별 성취도", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 
                 ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
-                ax2.text(0.5, 1.08, "(파란색: 학생 점수 / 빨간색: 전체 평균)", transform=ax2.transAxes, ha='center', fontsize=9, color='#555')
+                
+                # 🌟 [수정] 범례 설명 문구에 만점 정보 추가
+                ax2.text(0.5, 1.08, "(파란 막대: 학생 점수 / 연회색 막대: 단원 만점 / 빨간선: 전체 평균)", transform=ax2.transAxes, ha='center', fontsize=9, color='#555')
                 
                 for i, bar in enumerate(bars):
                     sv, av = int(bar.get_height()), int(unit_avg_data['평균득점'].iloc[i])
-                    ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f"{sv}점", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT)
-                    ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f" ({av}점)", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED)
+                    ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f"{sv}점", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT, zorder=5)
+                    ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f" ({av}점)", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED, zorder=5)
   
                 # --- 하단 심층 분석 박스 ---
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
@@ -262,7 +271,7 @@ def generate_jeet_expert_report(target_name, selected_test):
         return True, pdf_buffer, "리포트 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
-# --- 4. Streamlit 웹 UI 구성 ---
+# --- 4. Streamlit 웹 UI 구성 (생략/유지) ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 col1, col2 = st.columns([8, 2])
 with col1: st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
