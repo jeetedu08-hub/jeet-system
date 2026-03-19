@@ -85,6 +85,9 @@ def generate_jeet_expert_report(target_name, selected_test):
         total_analysis = df_info.copy()
         total_analysis['평균득점'] = total_analysis['문항번호'].apply(lambda x: avg_per_q.get(str(x), 0))
         
+        # 데이터 내의 '문제해결력'을 '문제\n해결력'으로 변환 (그래프용)
+        total_analysis['영역'] = total_analysis['영역'].str.replace('문제해결력', '문제\n해결력')
+        
         avg_cat_ratio = (total_analysis.groupby('영역')['평균득점'].sum() / total_analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
         unit_avg_data = total_analysis.groupby('단원').agg({'평균득점': 'sum'})
         unit_avg_data = unit_avg_data.reindex([u for u in unit_order if u in unit_avg_data.index])
@@ -100,6 +103,9 @@ def generate_jeet_expert_report(target_name, selected_test):
             student_grade = s_row.get('학년', '')
             
             analysis = df_info.copy()
+            # 데이터 내의 '문제해결력' 변환
+            analysis['영역'] = analysis['영역'].str.replace('문제해결력', '문제\n해결력')
+            
             analysis['정답여부'] = [safe_to_int(s_row.get(str(q), 0)) for q in analysis['문항번호']]
             analysis['득점'] = analysis['정답여부'] * analysis['배점']
             
@@ -159,7 +165,6 @@ def generate_jeet_expert_report(target_name, selected_test):
                     for t in [txt_s, txt_a]: t.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
                 ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
                 
-                # 타이틀 굵게
                 title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 
@@ -174,7 +179,6 @@ def generate_jeet_expert_report(target_name, selected_test):
                 max_val = unit_data['배점'].max(); max_val = 10 if pd.isna(max_val) or max_val == 0 else max_val
                 ax2.set_ylim(0, max_val * 1.5)
                 
-                # 타이틀 굵게
                 title2 = ax2.set_title("▶ 단원별 성취도", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 
@@ -186,20 +190,20 @@ def generate_jeet_expert_report(target_name, selected_test):
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f"{sv}점", ha='right', va='bottom', fontsize=9, fontweight='bold', color=COLOR_STUDENT)
                     ax2.text(bar.get_x() + bar.get_width()/2, sv + 0.5, f" ({av}점)", ha='left', va='bottom', fontsize=9, fontweight='bold', color=COLOR_RED)
   
-# --- 하단 심층 분석 박스 ---
+                # --- 하단 심층 분석 박스 ---
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
                 
-                # 메인 타이틀 굵게
                 t_p1 = fig.text(0.11, 0.44, "▶ ", fontsize=15, fontweight='bold', color=COLOR_NAVY)
                 t_p2 = fig.text(0.13, 0.44, " JEET", fontsize=15, fontweight='bold', color=COLOR_RED)
-                t_p3 = fig.text(0.185, 0.44, f"  중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=15, fontweight='bold', color=COLOR_NAVY)
+                t_p3 = fig.text(0.185, 0.44, f"   중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=15, fontweight='bold', color=COLOR_NAVY)
                 t_p1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 t_p2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_RED)])
                 t_p3.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 
                 avg_val, total_avg_val = int(cat_ratio.mean()), int(avg_cat_ratio.mean())
                 diff_cats = s_ordered - a_ordered
+                # 강약점 분석에서도 줄바꿈된 텍스트가 필요할 경우 그대로 사용
                 best_cat = diff_cats.idxmax() if not diff_cats.empty else "종합"
                 worst_cat = diff_cats.idxmin() if not diff_cats.empty else "종합"
                 unit_diff = unit_data['득점'] - unit_avg_data['평균득점']
@@ -210,35 +214,37 @@ def generate_jeet_expert_report(target_name, selected_test):
                 elif avg_val >= 60: eval_tier = "개념을 정립하며 꾸준히 도약 중인 성취도"
                 else: eval_tier = "기초를 다지며 가능성을 키워가는 단계의 성취도"
                 
+                # 🌟 [수정] 솔루션 키값에 줄바꿈 반영
                 solution_dict = {
                     '계산력': "꾸준한 연산 연습을 통해 풀이의 정확도와 속도를 높여 나간다면 실전에서 더욱 빛을 발할 것입니다.",
                     '이해력': "백지에 핵심 개념을 직접 정리해보는 습관을 통해 학습의 뼈대를 더욱 단단하게 만드는 과정이 큰 도움이 될 것입니다.",
                     '추론력': "어려운 문제도 차근차근 단계별로 분석하며 출제 의도를 파악하는 훈련을 병행하여 사고의 깊이를 더해 가길 권장합니다.",
-                    '문제해결력': "다양한 유형이 복합된 심화 문제를 끝까지 스스로 해결해보는 경험을 통해 수학적 자신감을 한층 높여 나갈 시점입니다."
+                    '문제\n해결력': "다양한 유형이 복합된 심화 문제를 끝까지 스스로 해결해보는 경험을 통해 수학적 자신감을 한층 높여 나갈 시점입니다."
                 }
                 worst_solution = solution_dict.get(worst_cat, "부족한 부분을 맞춤 클리닉으로 채워 나간다면 충분히 더 큰 도약이 가능합니다.")
 
-                # 🌟 [수정] 박스 영역을 벗어나지 않도록 너비와 간격 재조정
-                y_start = 0.415  # 시작 높이 살짝 상향
-                line_spacing = 0.088 # 섹션 간 간격 (박스 높이 0.32 내에 3개 섹션 배치)
+                # 하단 섹션 구성
+                y_start = 0.415  
+                line_spacing = 0.088 
                 
+                # 텍스트 내에서 줄바꿈된 단어를 다시 보기 좋게 합쳐서 보여주고 싶다면 .replace('\n', '') 사용 가능
+                # 여기서는 그대로(줄바꿈 상태) 혹은 합쳐서 표시할지 선택 가능합니다. 일단 합쳐서 표시하도록 처리했습니다.
+                display_best_cat = best_cat.replace('\n', '')
+                display_worst_cat = worst_cat.replace('\n', '')
+
                 sections = [
                     ("1. 종합 진단", f"{student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."),
-                    ("2. 강약점 분석", f"영역별 분석 결과 '{best_cat}'에서 뛰어난 역량이 확인되나, 상대적으로 '{worst_cat}' 역량 보완이 이루어진다면 더 큰 성장이 기대됩니다. '{worst_unit}' 단원의 핵심 개념을 다시 점검해 볼 필요가 있습니다."),
-                    ("3. JEET 맞춤 솔루션", f"단기적으로는 '{worst_unit}' 오답 노트를 작성하며 취약 유형에 익숙해져야 합니다. '{worst_cat}' 역량을 위해 {worst_solution}")
+                    ("2. 강약점 분석", f"영역별 분석 결과 '{display_best_cat}'에서 뛰어난 역량이 확인되나, 상대적으로 '{display_worst_cat}' 역량 보완이 이루어진다면 더 큰 성장이 기대됩니다. '{worst_unit}' 단원의 핵심 개념을 다시 점검해 볼 필요가 있습니다."),
+                    ("3. JEET 맞춤 솔루션", f"단기적으로는 '{worst_unit}' 오답 노트를 작성하며 취약 유형에 익숙해져야 합니다. '{display_worst_cat}' 역량을 위해 {worst_solution}")
                 ]
 
                 curr_y = y_start
                 for subtitle, content in sections:
-                    # 소제목
                     stxt = fig.text(0.11, curr_y, subtitle, fontsize=10.5, fontweight='bold', color='#222')
                     stxt.set_path_effects([path_effects.withStroke(linewidth=0.6, foreground='#222')])
-                    
-                    # 내용 (너비를 58로 줄여 우측 경계 침범 방지)
                     wrapped_content = textwrap.fill(content, width=58)
                     fig.text(0.11, curr_y - 0.015, wrapped_content, fontsize=9.5, linespacing=1.5, va='top', color='#333')
-                    
-                    curr_y -= line_spacing
+                    curr_y -= line_spacing 
 
                 line_footer = plt.Line2D([0.05, 0.95], [0.12, 0.12], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure)
                 fig.lines.append(line_footer)
@@ -252,7 +258,7 @@ def generate_jeet_expert_report(target_name, selected_test):
         return True, pdf_buffer, "리포트 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
-# --- 4. Streamlit 웹 UI 구성 ---
+# --- 4. Streamlit 웹 UI 구성 (생략/유지) ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 col1, col2 = st.columns([8, 2])
 with col1: st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
@@ -281,7 +287,6 @@ with tab1:
             with ci2: input_school = st.text_input("학교")
             with ci3: input_grade = st.selectbox("학년", ["중1", "중2", "중3"])
             st.markdown("---")
-            
             answers = {}
             for i in range(0, len(question_numbers), 5):
                 cols = st.columns(5)
@@ -289,7 +294,6 @@ with tab1:
                     with cols[j]:
                         choice = st.radio(f"**{q_num}번**", options=["O", "X"], horizontal=True, key=f"q_{q_num}")
                         answers[str(q_num)] = 1 if choice == "O" else 0
-
             if st.form_submit_button("구글 시트에 성적 저장하기", type="primary"):
                 clean_name = input_name.strip()
                 if not clean_name: st.error("⚠️ 이름을 입력해주세요.")
