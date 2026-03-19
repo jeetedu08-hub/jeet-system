@@ -176,7 +176,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 fig.text(0.26, 0.49, "(파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=9, color='#555')
   
-                # --- 🌟 단원별 성취도 그래프 (흰색 테두리 수치 적용) ---
+                # --- 🌟 단원별 성취도 그래프 (막대 안쪽 배치 수정) ---
                 ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
                 x_pos = np.arange(len(unit_data))
                 bar_width = 0.22 
@@ -184,7 +184,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 s_pct = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
                 a_pct = (unit_avg_data['평균득점'] / unit_data['배점'] * 100).fillna(0)
                 
-                # 막대 그래프 그리기
+                # 막대 그래프 그리기 (zorder=3 유지)
                 ax2.bar(x_pos - bar_width, [100] * len(x_pos), color='#B0BEC5', alpha=0.7, width=bar_width, zorder=3)
                 ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3)
                 ax2.bar(x_pos + bar_width, a_pct, color=COLOR_RED, alpha=0.8, width=bar_width, zorder=3)
@@ -192,36 +192,40 @@ def generate_jeet_expert_report(target_name, selected_test):
                 ax2.tick_params(axis='x', which='both', length=0) 
                 ax2.set_xticks(x_pos); ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
                 
-                ax2.set_ylim(0, 125) # 테두리 텍스트를 위해 상단 여백 유지
+                # y축 범위를 깔끔하게 0~100 (또는 여백 포함 110)으로 고정
+                ax2.set_ylim(0, 110) 
                 title2 = ax2.set_title("▶ 단원별 성취도 (%)", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
                 
                 fig.text(0.725, 0.485, "(회색: 단원 만점(100%) / 파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=8.5, color='#555')
                 
-                # 🌟 [수정 부분] 흰색 테두리를 강화하여 수치 표시
+                # 🌟 [수정 부분] 수치를 막대 그래프 안쪽 경계선에 배치
                 for i in range(len(x_pos)):
                     s_val = int(s_pct.iloc[i])
                     a_val = int(a_pct.iloc[i])
                     
-                    # 1. 총점 100% (막대 바로 위, 흰색 테두리)
-                    t1 = ax2.text(x_pos[i] - bar_width, 103, "100%", ha='center', va='bottom', fontsize=7, fontweight='bold', color='#455A64')
+                    # 1. 총점 100% (회색 막대 안쪽, 검은 글씨)
+                    t1 = ax2.text(x_pos[i] - bar_width, 98, "100%", ha='center', va='top', fontsize=7, fontweight='bold', color='#455A64')
                     
-                    # 2. 학생 성취율 (막대 바로 위, 흰색 테두리)
-                    t2 = ax2.text(x_pos[i], s_val + 3, f"{s_val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_STUDENT)
+                    # 2. 학생 성취율 (파란 막대 안쪽, 흰 글씨)
+                    # 수치가 너무 낮으면 안쪽 배치가 어색하므로 조건부 위치 조정
+                    s_y_pos = s_val - 2 if s_val > 15 else s_val + 2
+                    s_color = 'white' if s_val > 15 else COLOR_STUDENT
+                    t2 = ax2.text(x_pos[i], s_y_pos, f"{s_val}%", ha='center', va='top', fontsize=7.5, fontweight='bold', color=s_color)
                     
-                    # 3. 평균 성취율 (막대 바로 위, 흰색 테두리)
-                    # 수치가 같을 때 겹침을 최소화하기 위해 '평균' 수치를 1번 전략과 섞어 살짝 더 높게 배치 (가독성 보장)
-                    a_y = a_val + 3
-                    if abs(s_val - a_val) < 7: # 두 수치가 7% 미만으로 차이 날 때
-                        a_y = a_val + 11      # 평균 수치를 위로 더 띄움
+                    # 3. 평균 성취율 (빨간 막대 안쪽, 흰 글씨)
+                    # 수치가 서로 비슷해도 막대 안쪽이라 겹침 걱정 없음
+                    a_y_pos = a_val - 2 if a_val > 15 else a_val + 2
+                    a_color = 'white' if a_val > 15 else COLOR_RED
+                    t3 = ax2.text(x_pos[i] + bar_width, a_y_pos, f"{a_val}%", ha='center', va='top', fontsize=7.5, fontweight='bold', color=a_color)
                     
-                    t3 = ax2.text(x_pos[i] + bar_width, a_y, f"{a_val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_RED)
-                    
-                    # 모든 텍스트에 강력한 흰색 테두리(Path Effects) 적용
-                    # linewidth=3 정도로 설정하면 텍스트가 겹치더라도 배경과 확실히 분리됩니다.
-                    for t in [t1, t2, t3]: 
-                        t.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
+                    # 가독성을 위한 Stroke 효과 (막대 안쪽이라 흰색 테두리보다 얇은 테두리 적용)
+                    for t in [t2, t3]: 
+                        if t.get_color() == 'white':
+                            t.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#333')]) # 흰 글씨엔 얇은 어두운 테두리
+                        else:
+                            t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')]) # 색상 글씨엔 기존 테두리 유지
   
                 # --- 하단 심층 분석 박스 ---
                 rect_diag = plt.Rectangle((0.08, 0.15), 0.84, 0.32, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
