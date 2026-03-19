@@ -233,7 +233,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 
                 t_p1 = fig.text(0.11, 0.44, "▶ ", fontsize=15, fontweight='bold', color=COLOR_NAVY)
                 t_p2 = fig.text(0.13, 0.44, " JEET", fontsize=15, fontweight='bold', color=COLOR_RED)
-                t_p3 = fig.text(0.185, 0.44, f"   중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=15, fontweight='bold', color=COLOR_NAVY)
+                t_p3 = fig.text(0.185, 0.44, f"  중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=15, fontweight='bold', color=COLOR_NAVY)
                 t_p1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 t_p2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_RED)])
                 t_p3.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
@@ -266,7 +266,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 sections = [
                     ("1. 종합 진단", f"{student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."),
                     ("2. 강약점 분석", f"영역별 분석 결과 '{display_best_cat}'에서 뛰어난 역량이 확인되나, 상대적으로 '{display_worst_cat}' 역량 보완이 이루어진다면 더 큰 성장이 기대됩니다. '{worst_unit}' 단원의 핵심 개념을 다시 점검해 볼 필요가 있습니다."),
-                    ("3. JEET 맞춤 솔루션", f"단기적으로는 '{worst_unit}' 오답 노트를 작성하며 취약 유형에 익숙해져야 합니다. '{display_worst_cat}' 역량을 위해 {worst_solution}")
+                    ("3. JEET 맞춤 솔루션", f"단기적으로는 '{worst_unit}' 틀린 문제들을 다시 한번 풀어보면서 취약 유형에 익숙해져야 합니다. '{display_worst_cat}' 역량을 위해 {worst_solution}")
                 ]
 
                 curr_y = y_start
