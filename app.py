@@ -196,7 +196,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 
                 t_p1 = fig.text(0.11, 0.44, "▶ ", fontsize=13, fontweight='bold', color=COLOR_NAVY)
                 t_p2 = fig.text(0.13, 0.44, " JEET", fontsize=13, fontweight='bold', color=COLOR_RED)
-                t_p3 = fig.text(0.185, 0.44, f"  중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=13, fontweight='bold', color=COLOR_NAVY)
+                t_p3 = fig.text(0.185, 0.44, f" 중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=13, fontweight='bold', color=COLOR_NAVY)
                 for t_obj in [t_p1, t_p2, t_p3]: t_obj.set_path_effects([path_effects.withStroke(linewidth=1, foreground=t_obj.get_color())])
                 
                 # 데이터 추출
@@ -207,7 +207,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 eval_tier = "심화 개념까지 완벽히 소화하는 탁월한 성취도" if avg_val >= 90 else "성실한 학습 태도가 돋보이는 우수한 성취도" if avg_val >= 75 else "개념을 정립하며 꾸준히 도약 중인 성취도" if avg_val >= 60 else "기초를 다지며 가능성을 키워가는 단계의 성취도"
                 diag_total = f"{student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."
 
-                # [영역별 & 단원별 분석] 4단계 그룹화 통합
+                # [영역별  &  단원별 분석] 4단계 그룹화 통합
                 # 1. 영역별 그룹화
                 c_best = cat_ratio[cat_ratio >= 80].index.str.replace('\n', '').tolist()
                 c_good = cat_ratio[(cat_ratio >= 60) & (cat_ratio < 80)].index.str.replace('\n', '').tolist()
