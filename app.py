@@ -215,10 +215,10 @@ def generate_jeet_expert_report(target_name, selected_test):
                 c_warn = cat_ratio[cat_ratio < 40].index.str.replace('\n', '').tolist()
 
                 diag_combined = ""
-                if c_best: diag_combined += f"핵심 역량 분석 결과 {', '.join([f'[{c}]' for c in c_best])} 영역에서 최우수 성취도를 보이며 견고한 실력을 입증했습니다. "
+                if c_best: diag_combined += f"{', '.join([f'[{c}]' for c in c_best])} 영역에서 최우수 성취도를 보이며 견고한 실력을 입증했습니다. "
                 if c_good: diag_combined += f"{', '.join([f'[{c}]' for c in c_good])} 영역은 양호한 정답률을 보이며 평균 이상의 성과를 거두고 있습니다. "
                 if c_weak: diag_combined += f"{', '.join([f'[{c}]' for c in c_weak])} 영역은 개념 적용 단계의 정밀한 보완이 필요합니다. "
-                if c_warn: diag_combined += f"특히 {', '.join([f'[{c}]' for c in c_warn])} 영역은 기초 단계의 집중적인 재학습이 필요합니다. "
+                if c_warn: diag_combined += f"{', '.join([f'[{c}]' for c in c_warn])} 영역은 기초 단계의 집중적인 재학습이 필요합니다. "
 
                 # 2. 단원별 그룹화
                 g_best = u_res[u_res >= 80].index.tolist()
@@ -228,8 +228,8 @@ def generate_jeet_expert_report(target_name, selected_test):
 
                 if g_best: diag_combined += f"단원별로는 {', '.join([f'<{u}>' for u in g_best])} 단원은 굉장히 안정적이고, 완성도가 매우 높습니다. "
                 if g_good: diag_combined += f"{', '.join([f'<{u}>' for u in g_good])} 단원은 안정적이나 응용력 보강이 필요합니다. "
-                if g_weak: diag_combined += f"약점이 노출된 {', '.join([f'<{u}>' for u in g_weak])} 단원은 취약 유형에 대한 집중 분석이 요구됩니다. "
-                if g_warn: diag_combined += f"큰 결손을 보인 {', '.join([f'<{u}>' for u in g_warn])} 단원은 기초부터 다시 다지는 클리닉이 선행되어야 합니다."
+                if g_weak: diag_combined += f"{', '.join([f'<{u}>' for u in g_weak])} 단원은 취약 유형에 대한 집중 분석이 요구됩니다. "
+                if g_warn: diag_combined += f"{', '.join([f'<{u}>' for u in g_warn])} 단원은 기초부터 다시 다지는 클리닉이 선행되어야 합니다."
 
                 # [JEET 맞춤 솔루션]
                 weak_list = u_res[u_res < 60].index.tolist()
