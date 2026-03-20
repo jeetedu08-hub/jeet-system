@@ -54,6 +54,7 @@ def fetch_all_dataframes():
     return df_info, df_results
 
 def load_data():
+    doc, ws_info, ws_results, df_info, df_results = None, None, None, None, None
     doc = get_google_sheet()
     ws_info = doc.worksheet('Test_Info')
     ws_results = doc.worksheet('Student_Results')
@@ -176,7 +177,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 fig.text(0.26, 0.49, "(파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=9, color='#555')
   
-                # --- 단원별 성취도 그래프 (수정본 유지) ---
+                # --- 단원별 성취도 그래프 ---
                 ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
                 x_pos = np.arange(len(unit_data))
                 bar_width = 0.35 
@@ -213,8 +214,8 @@ def generate_jeet_expert_report(target_name, selected_test):
                         if t.get_color() == 'white': t.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#333')])
                         else: t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
   
-                # --- 4. 하단 심층 분석 박스 (요청 로직 반영) ---
-                rect_diag = plt.Rectangle((0.08, 0.10), 0.84, 0.37, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
+                # --- 4. 하단 심층 분석 박스 ---
+                rect_diag = plt.Rectangle((0.08, 0.12), 0.84, 0.35, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
                 
                 t_p1 = fig.text(0.11, 0.47, "▶ ", fontsize=14, fontweight='bold', color=COLOR_NAVY)
@@ -222,30 +223,20 @@ def generate_jeet_expert_report(target_name, selected_test):
                 t_p3 = fig.text(0.185, 0.47, f"   중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 for t_obj in [t_p1, t_p2, t_p3]: t_obj.set_path_effects([path_effects.withStroke(linewidth=1, foreground=t_obj.get_color())])
                 
-                # --- 데이터 추출 (로직용) ---
+                # --- 데이터 로직 ---
                 calc = cat_ratio.get('계산력', 0)
                 solve = cat_ratio.get('문제\n해결력', 0)
                 think = cat_ratio.get('이해력', 0)
                 infer = cat_ratio.get('추론력', 0)
-                
                 u_res = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
-                best_unit = u_res.idxmax() if not u_res.empty else "종합"
-                worst_unit = u_res.idxmin() if not u_res.empty else "종합"
                 
-                # 난이도별 분석용 데이터
-                diff_data = analysis.groupby('난이도').agg({'득점':'sum', '배점':'sum'})
-                concept = (diff_data.loc['개념', '득점'] / diff_data.loc['개념', '배점'] * 100) if '개념' in diff_data.index else 0
-                apply = (diff_data.loc['응용', '득점'] / diff_data.loc['응용', '배점'] * 100) if '응용' in diff_data.index else 0
-                deep = (diff_data.loc['심화', '득점'] / diff_data.loc['심화', '배점'] * 100) if '심화' in diff_data.index else 0
-
-                # 1. 종합진단
                 avg_val, total_avg_val = int(cat_ratio.mean()), int(avg_cat_ratio.mean())
                 if avg_val >= 90: eval_tier = "심화 개념까지 완벽히 소화하는 탁월한 성취도"
                 elif avg_val >= 75: eval_tier = "성실한 학습 태도가 돋보이는 우수한 성취도"
                 elif avg_val >= 60: eval_tier = "개념을 정립하며 꾸준히 도약 중인 성취도"
                 else: eval_tier = "기초를 다지며 가능성을 키워가는 단계의 성취도"
                 
-                # 2. 영역별 분석
+                # [영역별 분석]
                 diag_area = ""
                 if solve >= 75: diag_area += f"{student_name} 학생은 탁월한 문제해결 능력을 갖춘 학생입니다. 습득한 개념을 실전 문제에 효율적으로 투영하는 감각이 매우 훌륭합니다. "
                 else: diag_area += f"개념의 실전 적용 단계에서 세심한 접근이 필요해 보입니다. 발문의 핵심 조건을 구조화하는 습관을 들인다면 큰 성장이 기대됩니다. "
@@ -256,46 +247,43 @@ def generate_jeet_expert_report(target_name, selected_test):
                 if infer >= 75: diag_area += f"특히 추론 능력이 매우 뛰어나 수학적 규칙성을 발견하고 이를 논리적으로 확장하는 과정이 대단히 인상적입니다."
                 else: diag_area += f"추론 영역은 다양한 유형의 도식화 연습을 통해 논리적 연결 고리를 찾아내는 훈련을 지속한다면 충분히 보완 가능합니다."
 
-                # 3. 단원별 분석
+                # [단원별 분석]
+                best_unit = u_res.idxmax(); worst_unit = u_res.idxmin()
                 diag_unit = ""
                 if u_res.get(best_unit) >= 75: diag_unit += f"'{best_unit}' 단원에서 보여준 고도의 집중력과 완벽한 성취도는 매우 고무적입니다. "
-                if u_res.get(worst_unit) <= 45: diag_unit += f"상대적으로 '{worst_unit}' 단원은 개념의 계통성 있는 이해가 더 필요한 지점입니다. 지트(JEET) 정밀 분석 시스템을 통해 약점 단원의 오답 원인을 철저히 해소하겠습니다."
-                else: diag_unit += f"전 단원에서 고른 학습 밸런스를 보여주고 있습니다."
+                if u_res.get(worst_unit) <= 45: diag_unit += f"상대적으로 '{worst_unit}' 단원은 개념의 계통성 있는 이해가 더 필요한 지점입니다. "
+                else: diag_unit += f"전반적으로 단원별 성취도가 균형 있게 관리되고 있습니다. "
+                diag_unit += "지트(JEET) 정밀 분석 시스템을 통해 약점 단원의 오답 원인을 철저히 해소하겠습니다."
 
-                # 4. 난이도별 분석
-                diag_diff = ""
-                if concept >= 75 and apply >= 70: diag_diff += f"개념과 응용 수준의 성취도가 대단히 견고하여 수학적 기초 공사가 매우 잘 되어 있습니다. "
-                elif concept <= 50: diag_diff += f"개념의 완전한 숙지가 선행된다면, 이미 보유한 응용 잠재력이 더욱 빛을 발할 수 있을 것으로 판단됩니다. "
-                if deep >= 75: diag_diff += f"고난도 심화 문항까지 정밀하게 해결해낸 점은 {student_name} 학생이 가진 깊이 있는 사고 능력을 입증합니다."
-                else: diag_diff += f"심화 문항에 대한 도전 경험을 쌓아가고 있으며, 숙련도가 보완된다면 향후 더 높은 고득점 진입이 확실시됩니다."
+                # [JEET 맞춤 솔루션] - 60% 미만 단원 모두 추출
+                weak_units = u_res[u_res < 60].index.tolist()
+                if weak_units:
+                    weak_units_str = ", ".join([f"'{u}'" for u in weak_units])
+                    sol_text = f"성취도 60% 미만인 {weak_units_str} 단원에 대한 집중 보완이 필요합니다. 해당 단원들의 오답 노트를 작성하여 취약 유형에 익숙해져야 하며, JEET만의 맞춤 클리닉을 통해 결손 개념을 완벽히 메우는 정밀 지도를 이어가겠습니다."
+                else:
+                    sol_text = f"현재 모든 단원에서 안정적인 성취도를 보이고 있습니다. 상위권 도약을 위해 고난도 심화 유형에 대한 도전 경험을 넓히고, 실전 감각을 유지하는 방향으로 지도하겠습니다."
 
-                # 5. 솔루션
-                sol_text = f"단기적으로는 취약 유형 오답 노트를 작성하며 '{worst_unit}' 단원의 결손을 보완해야 합니다. JEET만의 맞춤 클리닉을 통해 상위권 도약을 위한 정밀 지도를 이어가겠습니다."
-
-                # --- 텍스트 렌더링 ---
                 sections = [
                     ("1. 종합 진단", f"{student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."),
                     ("[영역별 분석]", diag_area),
                     ("[단원별 분석]", diag_unit),
-                    ("[난이도별 분석]", diag_diff),
                     ("[JEET 맞춤 솔루션]", sol_text)
                 ]
 
-                curr_y = 0.445
+                curr_y = 0.435
                 for subtitle, content in sections:
-                    stxt = fig.text(0.11, curr_y, subtitle, fontsize=9.5, fontweight='bold', color='#222')
+                    stxt = fig.text(0.11, curr_y, subtitle, fontsize=10, fontweight='bold', color='#222')
                     stxt.set_path_effects([path_effects.withStroke(linewidth=0.5, foreground='#222')])
-                    wrapped_content = textwrap.fill(content, width=65)
-                    # 행간 조정을 위해 \n 기준으로 출력
-                    fig.text(0.11, curr_y - 0.012, wrapped_content, fontsize=8.8, linespacing=1.4, va='top', color='#333')
-                    curr_y -= 0.07 # 섹션 간격
+                    wrapped_content = textwrap.fill(content, width=64)
+                    fig.text(0.11, curr_y - 0.015, wrapped_content, fontsize=9, linespacing=1.5, va='top', color='#333')
+                    curr_y -= 0.082
 
-                line_footer = plt.Line2D([0.05, 0.95], [0.09, 0.09], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure)
+                line_footer = plt.Line2D([0.05, 0.95], [0.10, 0.10], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure)
                 fig.lines.append(line_footer)
                 campuses = [("수지 캠퍼스: 276-8003", "풍덕천로 129번길 16-1"), ("죽전 캠퍼스: 263-8003", "기흥구 죽현로 29"), ("광교 캠퍼스: 257-8003", "영통구 혜명로 10")]
                 for i, (name, addr) in enumerate(campuses):
-                    fig.text([0.22, 0.50, 0.78][i], 0.06, name, ha='center', fontsize=10, fontweight='bold', color=COLOR_NAVY)
-                    fig.text([0.22, 0.50, 0.78][i], 0.035, addr, ha='center', fontsize=7.5, color='#555')
+                    fig.text([0.22, 0.50, 0.78][i], 0.07, name, ha='center', fontsize=10, fontweight='bold', color=COLOR_NAVY)
+                    fig.text([0.22, 0.50, 0.78][i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
                 
                 pdf.savefig(fig); plt.close(fig)
             
