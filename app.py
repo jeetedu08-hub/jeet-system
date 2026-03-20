@@ -221,7 +221,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 # 심층 분석 헤더
                 t_p1 = fig.text(0.11, 0.44, "▶ ", fontsize=13, fontweight='bold', color=COLOR_NAVY)
                 t_p2 = fig.text(0.13, 0.44, " JEET", fontsize=13, fontweight='bold', color=COLOR_RED)
-                t_p3 = fig.text(0.185, 0.44, f"   중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=13, fontweight='bold', color=COLOR_NAVY)
+                t_p3 = fig.text(0.185, 0.44, f"  중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=13, fontweight='bold', color=COLOR_NAVY)
                 for t_obj in [t_p1, t_p2, t_p3]: t_obj.set_path_effects([path_effects.withStroke(linewidth=1, foreground=t_obj.get_color())])
                 
                 # 데이터 추출
@@ -233,15 +233,15 @@ def generate_jeet_expert_report(target_name, selected_test):
                 
                 # [종합 진단] 문구
                 if avg_val >= 90: eval_tier = "심화 개념까지 완벽히 소화하는 탁월한 성취도"
-                elif avg_val >= 75: eval_tier = "성실한 학습 태도가 돋보이는 우수한 성취도"
+                elif avg_val >= 70: eval_tier = "성실한 학습 태도가 돋보이는 우수한 성취도"
                 elif avg_val >= 60: eval_tier = "개념을 정립하며 꾸준히 도약 중인 성취도"
-                else: eval_tier = "기초를 다지며 가능성을 키워가는 단계의 성취도"
+                else: eval_tier = "기초를 다지면서 가능성을 키워가는 단계의 성취도"
                 diag_total = f"{student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."
 
-                # [영역별&단원별 분석] 문구 통합
+                # [영역별 & 단원별 분석] 문구 통합
                 diag_combined = ""
                 if solve >= 75: diag_combined += f"핵심 역량 분석 결과, 습득한 개념을 실전 문제에 효율적으로 투영하는 탁월한 문제해결 능력을 갖추고 있습니다. "
-                else: diag_combined += f"개념의 실전 적용 단계에서 세심한 접근이 필요하며, 발문의 조건을 구조화하는 습관이 중요합니다. "
+                else: diag_combined += f"개념의 실전 적용 단계에서 세심한 접근이 필요하며, 문제의 조건을 구조화하는 습관이 중요합니다. "
                 
                 if calc >= 75: diag_combined += f"기초 계산 숙련도가 안정적이어서 실수 없는 풀이가 가능하며, "
                 elif calc <= 40: diag_combined += f"다만 계산 숙련도 영역의 보완이 필요하므로 반복 연산 연습이 병행되어야 합니다. "
@@ -254,7 +254,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 weak_units = u_res[u_res < 60].index.tolist()
                 if weak_units:
                     weak_units_str = ", ".join([f"'{u}'" for u in weak_units])
-                    sol_text = f"성취도 60% 미만인 {weak_units_str} 단원에 대한 집중 보완이 시급합니다. 오답 노트를 작성하고 JEET만의 맞춤 클리닉을 통해 결손 개념을 완벽히 메우는 정밀 지도를 이어가겠습니다."
+                    sol_text = f"{weak_units_str} 단원에 대한 집중 보완이 필요합니다. 틀린 문제들을 여러번 풀어보며 JEET만의 프로그램인 JEET CARE+나 JDM을 통해 부족한 개념을 완벽히 메우고, 스스로 학습할 수 있는 습관을 기를 수 있도록 지도하겠습니다."
                 else:
                     sol_text = f"현재 모든 단원에서 안정적인 성취도를 보이고 있습니다. 상위권 도약을 위해 고난도 심화 유형에 대한 경험을 넓히고 실전 감각을 유지하는 방향으로 지도하겠습니다."
 
