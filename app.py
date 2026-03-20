@@ -213,16 +213,16 @@ def generate_jeet_expert_report(target_name, selected_test):
                         if t.get_color() == 'white': t.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#333')])
                         else: t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
   
-                # --- 4. 하단 심층 분석 박스 (레이아웃 최적화) ---
-                # 박스 높이를 약간 더 확보 (0.12 ~ 0.47)
+                # --- 4. 하단 심층 분석 박스 (레이아웃 수정) ---
                 rect_diag = plt.Rectangle((0.08, 0.12), 0.84, 0.35, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
                 
-                t_p1 = fig.text(0.11, 0.445, "▶ ", fontsize=13, fontweight='bold', color=COLOR_NAVY)
-                t_p2 = fig.text(0.13, 0.445, " JEET", fontsize=13, fontweight='bold', color=COLOR_RED)
-                t_p3 = fig.text(0.185, 0.445, f"   중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=13, fontweight='bold', color=COLOR_NAVY)
+                t_p1 = fig.text(0.11, 0.44, "▶ ", fontsize=14, fontweight='bold', color=COLOR_NAVY)
+                t_p2 = fig.text(0.13, 0.44, " JEET", fontsize=14, fontweight='bold', color=COLOR_RED)
+                t_p3 = fig.text(0.185, 0.44, f"   중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=14, fontweight='bold', color=COLOR_NAVY)
+                for t_obj in [t_p1, t_p2, t_p3]: t_obj.set_path_effects([path_effects.withStroke(linewidth=1, foreground=t_obj.get_color())])
                 
-                # 데이터 로직 처리
+                # --- 데이터 로직 처리 ---
                 calc = cat_ratio.get('계산력', 0); solve = cat_ratio.get('문제\n해결력', 0)
                 think = cat_ratio.get('이해력', 0); infer = cat_ratio.get('추론력', 0)
                 u_res = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
@@ -233,29 +233,32 @@ def generate_jeet_expert_report(target_name, selected_test):
                 elif avg_val >= 60: eval_tier = "개념을 정립하며 꾸준히 도약 중인 성취도"
                 else: eval_tier = "기초를 다지며 가능성을 키워가는 단계의 성취도"
                 
+                # [영역별 분석]
                 diag_area = ""
                 if solve >= 75: diag_area += f"{student_name} 학생은 탁월한 문제해결 능력을 갖춘 학생입니다. 습득한 개념을 실전 문제에 효율적으로 투영하는 감각이 매우 훌륭합니다. "
                 else: diag_area += f"개념의 실전 적용 단계에서 세심한 접근이 필요해 보입니다. 발문의 핵심 조건을 구조화하는 습관을 들인다면 큰 성장이 기대됩니다. "
                 if calc >= 75: diag_area += f"기초 계산 숙련도가 안정적이어서 실수 없는 풀이가 가능합니다. "
-                elif calc <= 40: diag_area += f"다만, 숙련도 영역인 계산력에서 다소 아쉬움이 관찰됩니다. 반복 연산 연습을 통해 계산 시간을 단축하고 정확도를 높이는 과정이 병행되어야 합니다. "
+                elif calc <= 40: diag_area += f"다만, 숙련도 영역인 계산력에서 다소 아쉬움이 관찰됩니다. 반복 연산 연습을 통해 계산 시간이 단축되고 정확도를 높이는 과정이 병행되어야 합니다. "
                 if think >= 50: diag_area += f"사고력 지표는 안정적인 흐름을 보이며 어려운 문제에 도전할 수 있는 기본 체력을 보여주고 있습니다. "
                 else: diag_area += f"사고력 영역은 현재 성장하는 단계에 있으며, 꾸준한 유형 분석을 통해 사고의 폭을 점진적으로 넓혀가는 것을 추천합니다. "
                 if infer >= 75: diag_area += f"특히 추론 능력이 매우 뛰어나 수학적 규칙성을 발견하고 이를 논리적으로 확장하는 과정이 대단히 인상적입니다."
                 else: diag_area += f"추론 영역은 다양한 유형의 도식화 연습을 통해 논리적 연결 고리를 찾아내는 훈련을 지속한다면 충분히 보완 가능합니다."
 
+                # [단원별 분석]
                 best_unit = u_res.idxmax(); worst_unit = u_res.idxmin()
                 diag_unit = f"'{best_unit}' 단원에서 고도의 집중력과 완벽한 성취도를 보여주었습니다. "
                 if u_res.get(worst_unit) <= 45: diag_unit += f"상대적으로 '{worst_unit}' 단원은 개념의 계통성 있는 이해가 더 필요한 지점입니다. "
                 diag_unit += "지트(JEET) 정밀 분석 시스템을 통해 약점 단원의 오답 원인을 철저히 해소하겠습니다."
 
+                # [JEET 맞춤 솔루션]
                 weak_units = u_res[u_res < 60].index.tolist()
                 if weak_units:
                     weak_units_str = ", ".join([f"'{u}'" for u in weak_units])
-                    sol_text = f"성취도 60% 미만인 {weak_units_str} 단원에 대한 집중 보완이 필요합니다. 오답 노트를 통해 취약 유형에 익숙해져야 하며, 맞춤 클리닉으로 결손 개념을 완벽히 메우는 정밀 지도를 이어가겠습니다."
+                    sol_text = f"성취도 60% 미만인 {weak_units_str} 단원에 대한 집중 보완이 필요합니다. 취약 유형 오답 노트를 작성하고, 맞춤 클리닉을 통해 결손 개념을 완벽히 메우는 정밀 지도를 이어가겠습니다."
                 else:
-                    sol_text = "현재 모든 단원에서 안정적인 성취도를 보이고 있습니다. 상위권 도약을 위해 고난도 심화 유형에 대한 도전 경험을 넓히고, 실전 감각을 유지하는 방향으로 지도하겠습니다."
+                    sol_text = "현재 모든 단원에서 안정적인 성취도를 보이고 있습니다. 상위권 도약을 위해 고난도 심화 유형에 대한 도전 경험을 넓히고 실전 감각을 유지하는 방향으로 지도하겠습니다."
 
-                # 섹션별 데이터 구성
+                # --- 렌더링 섹션 데이터 구성 ---
                 sections = [
                     ("1. 종합 진단", f"{student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."),
                     ("[영역별 분석]", diag_area),
@@ -263,23 +266,25 @@ def generate_jeet_expert_report(target_name, selected_test):
                     ("[JEET 맞춤 솔루션]", sol_text)
                 ]
 
-                # --- 텍스트 렌더링 시작 ---
-                # 시작 높이와 섹션 간 간격을 정교하게 설정
-                start_y = 0.415 
-                gap_y = 0.075 # 섹션 간격 (박스 높이에 맞춰 일정하게 배분)
+                # --- [수정 핵심] 간격 자동 계산 및 렌더링 ---
+                curr_y = 0.415 # 시작 높이
+                gap_y = 0.08  # 각 섹션의 최소 고정 간격 (폰트 크기에 따라 조정 필요)
 
-                for i, (subtitle, content) in enumerate(sections):
-                    curr_y = start_y - (i * gap_y)
-                    
+                for subtitle, content in sections:
                     # 소제목 출력
-                    stxt = fig.text(0.11, curr_y, subtitle, fontsize=9.5, fontweight='bold', color='#222')
+                    stxt = fig.text(0.11, curr_y, subtitle, fontsize=10, fontweight='bold', color='#222')
                     stxt.set_path_effects([path_effects.withStroke(linewidth=0.5, foreground='#222')])
                     
-                    # 내용 출력 (글자 크기와 줄바꿈 폭 조정)
-                    wrapped_content = textwrap.fill(content, width=68)
-                    fig.text(0.11, curr_y - 0.012, wrapped_content, fontsize=8.8, linespacing=1.4, va='top', color='#333')
+                    # [영역별 분석]이 길어지는 것을 고려하여 줄바꿈 폭 조정 (기존 60 -> 64)
+                    wrapped_content = textwrap.fill(content, width=64)
+                    
+                    # 본문 출력 ( va='top' 으로 설정하여 아래로 글이 써지도록 함 )
+                    # 행간(linespacing)을 미세하게 조정하여 겹침 방지
+                    ctxt = fig.text(0.11, curr_y - 0.012, wrapped_content, fontsize=9, linespacing=1.6, va='top', color='#333')
+                    
+                    # 다음 섹션의 위치 계산: 텍스트의 실제 높이를 반영하여 이동
+                    curr_y -= gap_y
 
-                # 푸터 설정
                 line_footer = plt.Line2D([0.05, 0.95], [0.10, 0.10], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure)
                 fig.lines.append(line_footer)
                 campuses = [("수지 캠퍼스: 276-8003", "풍덕천로 129번길 16-1"), ("죽전 캠퍼스: 263-8003", "기흥구 죽현로 29"), ("광교 캠퍼스: 257-8003", "영통구 혜명로 10")]
