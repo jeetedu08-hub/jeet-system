@@ -132,7 +132,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
                 txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
   
-                # --- 그래프 생략 (기존과 동일) ---
+                # --- 그래프 렌더링 생략 (기존 유지) ---
                 ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
                 all_cats = cat_ratio.index.tolist()
                 ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
@@ -168,7 +168,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                         if c == 'white': t.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#333')])
                         else: t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
 
-                # --- 4. 하단 심층 분석 박스 (통합 및 그룹화 로직) ---
+                # --- 4. 하단 심층 분석 박스 (영역 및 단원 4단계 그룹화 적용) ---
                 rect_diag = plt.Rectangle((0.08, 0.12), 0.84, 0.35, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
                 
@@ -179,10 +179,6 @@ def generate_jeet_expert_report(target_name, selected_test):
                 for t_obj in [t_p1, t_p2, t_p3]: t_obj.set_path_effects([path_effects.withStroke(linewidth=1, foreground=t_obj.get_color())])
                 
                 # 데이터 추출
-                calc_s, calc_a = cat_ratio.get('계산력', 0), avg_cat_ratio.get('계산력', 0)
-                solve_s, solve_a = cat_ratio.get('문제\n해결력', 0), avg_cat_ratio.get('문제\n해결력', 0)
-                think_s, think_a = cat_ratio.get('이해력', 0), avg_cat_ratio.get('이해력', 0)
-                infer_s, infer_a = cat_ratio.get('추론력', 0), avg_cat_ratio.get('추론력', 0)
                 u_res = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
                 avg_val, total_avg_val = int(cat_ratio.mean()), int(avg_cat_ratio.mean())
                 
@@ -190,32 +186,37 @@ def generate_jeet_expert_report(target_name, selected_test):
                 eval_tier = "심화 개념까지 완벽히 소화하는 탁월한 성취도" if avg_val >= 90 else "성실한 학습 태도가 돋보이는 우수한 성취도" if avg_val >= 75 else "개념을 정립하며 꾸준히 도약 중인 성취도" if avg_val >= 60 else "기초를 다지며 가능성을 키워가는 단계의 성취도"
                 diag_total = f"{student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."
 
-                # [영역별&단원별 분석] 통합 로직
-                # 1. 영역별 분석 문구 (전체 평균 기준)
-                diag_area = ""
-                diag_area += f"문제해결력 지표가 평균({int(solve_a)}%)을 상회하며 조건 해석이 우수합니다. " if solve_s >= solve_a else f"문제해결력은 평균({int(solve_a)}%) 대비 보완이 필요하며 핵심 조건 정리 연습이 권장됩니다. "
-                diag_area += f"계산 숙련도는 안정적이나, " if calc_s >= calc_a else f"계산력 지표는 평균 대비 아쉬움이 관찰되며, "
-                diag_area += f"사고력 지표가 견고하여 심화 학습이 가능합니다. " if think_s >= think_a else f"개념의 명확한 정립을 통해 사고 지표를 평균치로 높여야 합니다. "
+                # [영역별&단원별 분석] 통합 및 4단계 그룹화
+                # 1. 영역별 그룹화 (성취도 구간 기준)
+                cat_best = cat_ratio[cat_ratio >= 80].index.str.replace('\n', '').tolist()
+                cat_good = cat_ratio[(cat_ratio >= 60) & (cat_ratio < 80)].index.str.replace('\n', '').tolist()
+                cat_weak = cat_ratio[(cat_ratio >= 40) & (cat_ratio < 60)].index.str.replace('\n', '').tolist()
+                cat_warn = cat_ratio[cat_ratio < 40].index.str.replace('\n', '').tolist()
 
-                # 2. 단원별 분석 그룹화 로직 (요청 사항 핵심)
+                diag_combined = ""
+                if cat_best: diag_combined += f"핵심 역량 지표 중 {', '.join([f'[{c}]' for c in cat_best])} 영역은 80% 이상의 최우수 성취도를 보이며 탄탄한 경쟁력을 갖추고 있습니다. "
+                if cat_good: diag_combined += f"{', '.join([f'[{c}]' for c in cat_good])} 영역은 60~80%의 성취도로 평균 이상의 안정감을 보이나 심화 정밀도가 필요합니다. "
+                if cat_weak: diag_combined += f"{', '.join([f'[{c}]' for c in cat_weak])} 영역은 40~60%의 정답률로 개념 적용 과정에서의 세심한 보완이 요구됩니다. "
+                if cat_warn: diag_combined += f"특히 {', '.join([f'[{c}]' for c in cat_warn])} 영역은 40% 미만으로 기초 개념의 재정립과 집중 훈련이 시급한 지점입니다. "
+
+                # 2. 단원별 그룹화 (성취도 구간 기준)
                 g_best = u_res[u_res >= 80].index.tolist()
                 g_good = u_res[(u_res >= 60) & (u_res < 80)].index.tolist()
                 g_weak = u_res[(u_res >= 40) & (u_res < 60)].index.tolist()
                 g_warn = u_res[u_res < 40].index.tolist()
 
-                diag_unit = ""
-                if g_best: diag_unit += f"성취도 80% 이상의 최우수 단원은 {', '.join([f'<{u}>' for u in g_best])}이며 완벽한 개념 내면화가 이루어졌습니다. "
-                if g_good: diag_unit += f"{', '.join([f'<{u}>' for u in g_good])} 단원은 60~80%의 양호한 정답률을 보이나 심화 적응력을 높여야 합니다. "
-                if g_weak: diag_unit += f"보완이 시급한 40~60% 구간 단원은 {', '.join([f'<{u}>' for u in g_weak])}으로 오답 분석이 필수적입니다. "
-                if g_warn: diag_unit += f"특히 {', '.join([f'<{u}>' for u in g_warn])} 단원은 40% 미만의 성취도로 기초 단계부터 재점검이 필요합니다."
+                if g_best: diag_combined += f"단원 분석 결과 {', '.join([f'<{u}>' for u in g_best])} 과정은 완벽한 내면화가 확인되었습니다. "
+                if g_good: diag_combined += f"{', '.join([f'<{u}>' for u in g_good])} 단원은 안정적인 성취를 보이나 응용력을 강화해야 합니다. "
+                if g_weak: diag_combined += f"보완이 필요한 {', '.join([f'<{u}>' for u in g_weak])} 단원은 오답 분석을 통한 약점 보강이 필수적입니다. "
+                if g_warn: diag_combined += f"심각한 결손이 보이는 {', '.join([f'<{u}>' for u in g_warn])} 단원은 기초부터 다시 다지는 집중 클리닉이 선행되어야 합니다."
 
                 # [JEET 맞춤 솔루션]
                 weak_list = u_res[u_res < 60].index.tolist()
-                sol_text = f"정답률 보완이 필요한 {', '.join([f'<{u}>' for u in weak_list])} 단원의 오답 노트를 작성하고, JEET만의 맞춤 클리닉을 통해 결손 개념을 완벽히 메우는 정밀 지도를 이어가겠습니다." if weak_list else "전 단원 안정적인 성취도를 유지하며 고난도 심화 유형에 대한 도전 경험을 넓혀 상위권 굳히기에 돌입할 시점입니다."
+                sol_text = f"정답률 보완이 시급한 {', '.join([f'<{u}>' for u in weak_list])} 단원에 대한 맞춤형 오답 관리와 JEET만의 개별 클리닉을 통해 학습 결손을 완벽히 해소해 나가겠습니다." if weak_list else "전 영역에서 고른 학습 밸런스를 유지하고 있으므로, 고난도 심화 유형 도전을 통해 최상위권의 사고력을 굳히는 방향으로 지도하겠습니다."
 
                 sections = [
                     ("[종합 진단]", diag_total),
-                    ("[영역별&단원별 분석]", diag_area + diag_unit),
+                    ("[영역별&단원별 분석]", diag_combined),
                     ("[JEET 맞춤 솔루션]", sol_text)
                 ]
 
