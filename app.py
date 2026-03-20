@@ -132,7 +132,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                 txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
                 txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
   
-                # --- 방사형 그래프 (타이틀 복구) ---
+                # --- 방사형 그래프 ---
                 ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
                 all_cats = cat_ratio.index.tolist()
                 ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
@@ -161,12 +161,11 @@ def generate_jeet_expert_report(target_name, selected_test):
                     for t in [txt_s, txt_a]: t.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
                 
                 ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
-                # 🌟 타이틀 복구
                 title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 fig.text(0.26, 0.49, "(파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=9, color='#555')
   
-                # --- 단원별 성취도 그래프 (타이틀 복구) ---
+                # --- 단원별 성취도 그래프 (X축 눈금 제거 반영) ---
                 ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
                 x_pos = np.arange(len(unit_data)); bar_width = 0.35 
                 s_pct = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
@@ -175,8 +174,11 @@ def generate_jeet_expert_report(target_name, selected_test):
                 ax2.bar(x_pos + bar_width/2, a_pct, color=COLOR_RED, alpha=0.8, width=bar_width, zorder=3)
                 
                 ax2.set_xticks(x_pos); ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
+                
+                # --- 요청하신 X축 튀어나온 막대기(눈금) 제거 코드 ---
+                ax2.tick_params(axis='x', which='both', length=0) 
+                
                 ax2.set_ylim(0, 110); ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
-                # 🌟 타이틀 복구
                 title2 = ax2.set_title("▶ 단원별 성취도 (%)", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
                 title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
                 
@@ -190,7 +192,7 @@ def generate_jeet_expert_report(target_name, selected_test):
                         if c == 'white': t.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#333')])
                         else: t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
 
-                # --- 4. 하단 심층 분석 박스 (요청 로직 반영) ---
+                # --- 4. 하단 심층 분석 박스 ---
                 rect_diag = plt.Rectangle((0.08, 0.12), 0.84, 0.35, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
                 fig.patches.append(rect_diag)
                 
@@ -199,16 +201,12 @@ def generate_jeet_expert_report(target_name, selected_test):
                 t_p3 = fig.text(0.185, 0.44, f" 중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=13, fontweight='bold', color=COLOR_NAVY)
                 for t_obj in [t_p1, t_p2, t_p3]: t_obj.set_path_effects([path_effects.withStroke(linewidth=1, foreground=t_obj.get_color())])
                 
-                # 데이터 추출
                 u_res = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
                 avg_val, total_avg_val = int(cat_ratio.mean()), int(avg_cat_ratio.mean())
                 
-                # [종합 진단]
                 eval_tier = "심화 개념까지 완벽히 소화하는 탁월한 성취도" if avg_val >= 90 else "성실한 학습 태도가 돋보이는 우수한 성취도" if avg_val >= 75 else "개념을 정립하며 꾸준히 도약 중인 성취도" if avg_val >= 60 else "기초를 다지며 가능성을 키워가는 단계의 성취도"
                 diag_total = f"{student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."
 
-                # [영역별  &  단원별 분석] 4단계 그룹화 통합
-                # 1. 영역별 그룹화
                 c_best = cat_ratio[cat_ratio >= 80].index.str.replace('\n', '').tolist()
                 c_good = cat_ratio[(cat_ratio >= 60) & (cat_ratio < 80)].index.str.replace('\n', '').tolist()
                 c_weak = cat_ratio[(cat_ratio >= 40) & (cat_ratio < 60)].index.str.replace('\n', '').tolist()
@@ -220,7 +218,6 @@ def generate_jeet_expert_report(target_name, selected_test):
                 if c_weak: diag_combined += f"{', '.join([f'[{c}]' for c in c_weak])} 영역은 개념 적용 단계의 정밀한 보완이 필요합니다. "
                 if c_warn: diag_combined += f"{', '.join([f'[{c}]' for c in c_warn])} 영역은 기초 단계의 집중적인 재학습이 필요합니다. "
 
-                # 2. 단원별 그룹화
                 g_best = u_res[u_res >= 80].index.tolist()
                 g_good = u_res[(u_res >= 60) & (u_res < 80)].index.tolist()
                 g_weak = u_res[(u_res >= 40) & (u_res < 60)].index.tolist()
@@ -231,13 +228,11 @@ def generate_jeet_expert_report(target_name, selected_test):
                 if g_weak: diag_combined += f"{', '.join([f'<{u}>' for u in g_weak])} 단원은 취약 유형에 대한 집중 분석이 요구됩니다. "
                 if g_warn: diag_combined += f"{', '.join([f'<{u}>' for u in g_warn])} 단원은 기초부터 다시 다지는 클리닉이 선행되어야 합니다."
 
-                # [JEET 맞춤 솔루션]
                 weak_list = u_res[u_res < 60].index.tolist()
                 sol_text = f" {', '.join([f'<{u}>' for u in weak_list])} 단원에 대한 오답 분석과 JEET만의 맞춤 솔루션인 JEET CARE+와 JDM(JEET DAILY MAKE UP)을 통해 부족한 단원을 메워 나가겠습니다." if weak_list else "모든 단원에서 고른 성취를 보이고 있으므로 상위권 도약을 위한 고난도 문항 도전과 실전 감각 유지가 핵심입니다."
 
                 sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", diag_combined), ("[JEET 맞춤 솔루션]", sol_text)]
 
-                # 렌더링 (간격 유지 및 겹침 방지)
                 curr_y, base_spacing = 0.41, 0.08
                 for subtitle, content in sections:
                     stxt = fig.text(0.11, curr_y, subtitle, fontsize=9.5, fontweight='bold', color='#222')
