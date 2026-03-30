@@ -258,16 +258,20 @@ def generate_jeet_expert_report(target_name, selected_test):
         return True, pdf_buffer, "리포트 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
-# --- 반별 일괄 리포트 생성 함수 추가 ---
-def generate_batch_report(target_class, selected_test):
+# --- 반별 일괄 리포트 생성 함수 추가 (선택 필터링 기능 탑재) ---
+def generate_batch_report(target_class, selected_test, selected_students=None):
     try:
         df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_int = prepare_report_data(selected_test)
         
-        # 입력받은 반과 일치하는 학생만 필터링
+        # 1차 필터링: 입력받은 반과 일치하는 학생
         class_students = df_results[df_results['반'].astype(str).str.strip() == str(target_class).strip()]
         
+        # 2차 필터링: 선택된 학생 명단이 있다면 해당 학생들만 남김
+        if selected_students is not None:
+            class_students = class_students[class_students['이름'].isin(selected_students)]
+        
         if class_students.empty:
-            return False, None, f"'{target_class}' 반 학생을 찾을 수 없습니다."
+            return False, None, f"선택된 학생 데이터가 없습니다."
             
         pdf_buffer = io.BytesIO()
         
@@ -312,7 +316,6 @@ test_list = df_info_all['시험명'].dropna().unique().tolist()
 selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
 df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 
-# 탭을 3개로 늘림
 tab1, tab2, tab3 = st.tabs(["📝 신규 성적 입력", "📑 개별 리포트 출력", "🗂️ 일괄 리포트 출력"])
 
 with tab1:
@@ -320,7 +323,7 @@ with tab1:
     question_numbers = df_info_filtered['문항번호'].tolist()
     if question_numbers:
         with st.form("data_input_form", clear_on_submit=True):
-            ci1, ci2, ci3, ci4 = st.columns(4) # 반 입력을 위해 4칸으로 변경
+            ci1, ci2, ci3, ci4 = st.columns(4)
             with ci1: input_name = st.text_input("이름")
             with ci2: input_class = st.text_input("반 (예: A반)")
             with ci3: input_school = st.text_input("학교")
@@ -345,7 +348,7 @@ with tab1:
                             col_str = str(col_name)
                             if col_str == '시험명': new_row.append(selected_test) 
                             elif col_str == '이름': new_row.append(clean_name)
-                            elif col_str == '반': new_row.append(input_class) # 반 정보 추가
+                            elif col_str == '반': new_row.append(input_class)
                             elif col_str == '학교': new_row.append(input_school)
                             elif col_str == '학년': new_row.append(input_grade)
                             elif col_str in answers: new_row.append(answers[col_str])
@@ -364,31 +367,48 @@ with tab2:
                 st.download_button("📥 PDF 다운로드", buf.getvalue(), f"{target_student}_리포트.pdf", "application/pdf")
             else: st.error(msg)
 
-# --- 탭 3: 일괄 리포트 출력 추가 ---
+# --- 탭 3: 학생 선택 기능이 포함된 일괄 리포트 출력 ---
 with tab3:
     st.subheader(f"[{selected_test}] 반별 전체 심층 분석 일괄 출력")
     
-    # '반' 컬럼이 스프레드시트에 있는지 체크하고 목록 불러오기
     if '반' in df_results_all.columns:
         class_list = df_results_all[df_results_all['시험명'] == selected_test]['반'].dropna().unique().tolist()
         class_list = [c for c in class_list if str(c).strip() != '' and str(c).strip() != '0']
         
         if class_list:
             target_class = st.selectbox("출력할 반을 선택하세요:", class_list)
+            
+            # 선택된 반의 학생 명단 불러오기
+            students_in_class = df_results_all[(df_results_all['시험명'] == selected_test) & (df_results_all['반'].astype(str).str.strip() == str(target_class).strip())]['이름'].tolist()
+            students_in_class = [s for s in students_in_class if str(s).strip() != '' and str(s).strip() != '0']
+            
+            if students_in_class:
+                selected_students = st.multiselect(
+                    "👇 출력할 학생을 선택하세요 (제외할 학생의 'X'를 누르세요):", 
+                    options=students_in_class, 
+                    default=students_in_class
+                )
+            else:
+                st.warning("선택하신 반에 등록된 학생이 없습니다.")
+                selected_students = []
         else:
             target_class = st.text_input("출력할 반 이름 입력:", placeholder="예: S반")
+            selected_students = None
     else:
         st.warning("⚠️ 구글 시트 'Student_Results' 탭에 '반' 컬럼이 없어 수동으로 입력해야 합니다.")
         target_class = st.text_input("출력할 반 이름 입력:", placeholder="예: S반")
+        selected_students = None
 
-    if st.button("반 전체 일괄 PDF 생성", type="primary"):
+    if st.button("반 전체/선택 일괄 PDF 생성", type="primary"):
         if not target_class.strip():
             st.error("반 이름을 입력하거나 선택해주세요.")
+        elif selected_students is not None and len(selected_students) == 0:
+            st.error("출력할 학생을 최소 1명 이상 선택해주세요.")
         else:
-            with st.spinner(f"'{target_class}' 반 학생들의 리포트를 하나로 모으는 중입니다. (학생 수에 따라 수십 초 소요될 수 있습니다)"):
-                success, buf, msg = generate_batch_report(target_class, selected_test)
+            with st.spinner(f"리포트를 하나로 모으는 중입니다. 잠시만 기다려주세요..."):
+                success, buf, msg = generate_batch_report(target_class, selected_test, selected_students)
                 if success:
                     st.success(msg)
-                    st.download_button("📥 일괄 PDF 다운로드", buf.getvalue(), f"{target_class}_전체_리포트.pdf", "application/pdf")
+                    st.download_button("📥 일괄 PDF 다운로드", buf.getvalue(), f"{target_class}_선택_리포트.pdf", "application/pdf")
                 else: 
                     st.error(msg)
