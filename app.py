@@ -164,7 +164,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 
     diag_combined = ""
     if c_best: diag_combined += f"{', '.join([f'[{c}]' for c in c_best])} 영역에서 최우수 성취도를 보이며 견고한 실력을 입증했습니다. "
-    if c_good: diag_combined += f"{', '.join([f'[{c}]' for c in c_good])} 영역은 양호한 정답률을 보이며 평균 이상의 성과를 거두고 있습니다. "
+    if c_good: diag_combined += f"{', '.join([f'[{c}]' for c in c_good])} 영역은 양호한 정답률을 보이며 평균 이상의 성과 거두고 있습니다. "
     if c_weak: diag_combined += f"{', '.join([f'[{c}]' for c in c_weak])} 영역은 개념 적용 단계의 정밀한 보완이 필요합니다. "
     if c_warn: diag_combined += f"{', '.join([f'[{c}]' for c in c_warn])} 영역은 기초 단계의 집중적인 재학습이 필요합니다. "
 
@@ -258,25 +258,27 @@ def generate_jeet_expert_report(target_name, selected_test):
         return True, pdf_buffer, "리포트 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
-# --- 반별 일괄 리포트 생성 함수 추가 (선택 필터링 기능 탑재) ---
+# --- 반별 일괄 리포트 생성 함수 추가 (선택 필터링 및 공백 제거 강력 대응) ---
 def generate_batch_report(target_class, selected_test, selected_students=None):
     try:
         df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_int = prepare_report_data(selected_test)
         
-        # 1차 필터링: 입력받은 반과 일치하는 학생
+        # 1차 필터링: 입력받은 반과 일치하는 학생 (양옆 공백 완전 제거 후 비교)
         class_students = df_results[df_results['반'].astype(str).str.strip() == str(target_class).strip()]
         
-        # 2차 필터링: 선택된 학생 명단이 있다면 해당 학생들만 남김
+        # 2차 필터링: 선택된 학생 명단이 있다면 해당 학생들만 남김 (이름의 양옆 공백도 완전 제거 후 비교)
         if selected_students is not None:
-            class_students = class_students[class_students['이름'].isin(selected_students)]
+            cleaned_selected = [str(s).strip() for s in selected_students]
+            class_students = class_students[class_students['이름'].astype(str).str.strip().isin(cleaned_selected)]
         
         if class_students.empty:
-            return False, None, f"선택된 학생 데이터가 없습니다."
+            return False, None, f"선택된 학생 데이터가 없습니다. (이름 공백/오타 확인 필요)"
             
         pdf_buffer = io.BytesIO()
         
         with PdfPages(pdf_buffer) as pdf:
             for _, s_row in class_students.iterrows():
+                # 여기서도 이름 공백 제거
                 student_name = str(s_row.get('이름', '')).strip()
                 if not student_name or student_name == '0': continue
                     
@@ -372,15 +374,21 @@ with tab3:
     st.subheader(f"[{selected_test}] 반별 전체 심층 분석 일괄 출력")
     
     if '반' in df_results_all.columns:
-        class_list = df_results_all[df_results_all['시험명'] == selected_test]['반'].dropna().unique().tolist()
-        class_list = [c for c in class_list if str(c).strip() != '' and str(c).strip() != '0']
+        # 시트 전체에서 존재하는 모든 반 이름을 긁어와서 선택 상자(Dropdown)로 만듭니다.
+        all_classes = df_results_all['반'].astype(str).str.strip().unique().tolist()
+        class_list = sorted([c for c in all_classes if c and c != '0' and c != 'nan'])
         
         if class_list:
-            target_class = st.selectbox("출력할 반을 선택하세요:", class_list)
+            # ✨ 텍스트 입력 대신 드롭다운으로 선택
+            target_class = st.selectbox("📌 출력할 반을 선택하세요:", class_list)
             
-            # 선택된 반의 학생 명단 불러오기
-            students_in_class = df_results_all[(df_results_all['시험명'] == selected_test) & (df_results_all['반'].astype(str).str.strip() == str(target_class).strip())]['이름'].tolist()
-            students_in_class = [s for s in students_in_class if str(s).strip() != '' and str(s).strip() != '0']
+            # 선택된 시험(selected_test)과 선택된 반(target_class)에 모두 속하는 학생 명단 추출
+            students_in_class = df_results_all[
+                (df_results_all['시험명'] == selected_test) & 
+                (df_results_all['반'].astype(str).str.strip() == target_class)
+            ]['이름'].astype(str).str.strip().tolist()
+            
+            students_in_class = sorted([s for s in students_in_class if s and s != '0' and s != 'nan'])
             
             if students_in_class:
                 selected_students = st.multiselect(
@@ -389,14 +397,15 @@ with tab3:
                     default=students_in_class
                 )
             else:
-                st.warning("선택하신 반에 등록된 학생이 없습니다.")
+                st.warning(f"⚠️ 현재 선택하신 '{selected_test}' 과정에 '{target_class}' 학생 데이터가 없습니다.")
                 selected_students = []
         else:
-            target_class = st.text_input("출력할 반 이름 입력:", placeholder="예: S반")
+            st.info("구글 시트에 아직 입력된 '반' 데이터가 없습니다.")
+            target_class = st.text_input("출력할 반 이름 직접 입력:", placeholder="예: S반")
             selected_students = None
     else:
         st.warning("⚠️ 구글 시트 'Student_Results' 탭에 '반' 컬럼이 없어 수동으로 입력해야 합니다.")
-        target_class = st.text_input("출력할 반 이름 입력:", placeholder="예: S반")
+        target_class = st.text_input("출력할 반 이름 직접 입력:", placeholder="예: S반")
         selected_students = None
 
     if st.button("반 전체/선택 일괄 PDF 생성", type="primary"):
