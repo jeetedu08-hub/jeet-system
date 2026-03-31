@@ -100,7 +100,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False).tolist() + [0]
     
     ax1.set_theta_direction(-1); ax1.set_theta_offset(np.pi/2.0)
-    # 평균 그래프 제거
     ax1.plot(angles, s_vals, color=COLOR_STUDENT, linewidth=2.5, label='학생 점수')
     ax1.set_ylim(0, 110); ax1.set_xticks(angles[:-1]); ax1.set_xticklabels([]); ax1.set_yticklabels([]) 
     
@@ -112,7 +111,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         s_v = int(s_vals[i])
         td = (s_v - 15 if s_v > 30 else s_v + 15) if '문제\n해결력' in label_text else (s_v + 10 if s_v < 85 else s_v - 18)
         
-        # 텍스트 ha를 'center'로 수정하여 점 위에 예쁘게 올라가도록 처리 (평균 수치 제거됨)
         txt_s = ax1.text(angle, td, f"{s_v}%", fontsize=9, fontweight='bold', color=COLOR_STUDENT, va='center', ha='center')
         txt_s.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
     
@@ -120,16 +118,16 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
     
-    # 평균 안내 문구 제거
     fig.text(0.26, 0.49, "(파란색: 학생 성취율)", ha='center', fontsize=9, color='#555')
 
-    # --- 단원별 성취도 그래프 (기존 유지) ---
+    # --- 단원별 성취도 그래프 (평균 제거 및 중앙 정렬) ---
     ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
-    x_pos = np.arange(len(unit_data)); bar_width = 0.35 
+    x_pos = np.arange(len(unit_data))
+    bar_width = 0.45 # 단일 막대이므로 너비를 약간 더 키워 안정감 있게 변경
     s_pct = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
-    a_pct = (unit_avg_data['평균득점'] / unit_data['배점'] * 100).fillna(0)
-    ax2.bar(x_pos - bar_width/2, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3)
-    ax2.bar(x_pos + bar_width/2, a_pct, color=COLOR_RED, alpha=0.8, width=bar_width, zorder=3)
+    
+    # 평균(a_pct) 및 평균 막대 그리기 삭제, 학생 막대만 중앙(x_pos)에 배치
+    ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3)
     
     ax2.set_xticks(x_pos); ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
     ax2.tick_params(axis='x', which='both', length=0) 
@@ -137,15 +135,18 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     title2 = ax2.set_title("▶ 단원별 성취도 (%)", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
     
-    fig.text(0.725, 0.485, "(파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=8.5, color='#555')
+    # 평균 관련 안내 텍스트 삭제
+    fig.text(0.725, 0.485, "(파란색: 학생 성취율)", ha='center', fontsize=8.5, color='#555')
     
+    # 학생 점수 텍스트만 출력하도록 루프 수정
     for i in range(len(x_pos)):
-        s_val, a_val = int(s_pct.iloc[i]), int(a_pct.iloc[i])
-        for val, pos, col in [(s_val, x_pos[i] - bar_width/2, COLOR_STUDENT), (a_val, x_pos[i] + bar_width/2, COLOR_RED)]:
-            y_p, c = (val - 3, 'white') if val > 15 else (val + 3, col)
-            t = ax2.text(pos, y_p, f"{val}%", ha='center', va='top' if val > 15 else 'bottom', fontsize=7.5, fontweight='bold', color=c)
-            if c == 'white': t.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#333')])
-            else: t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
+        val = int(s_pct.iloc[i])
+        pos = x_pos[i]
+        col = COLOR_STUDENT
+        y_p, c = (val - 3, 'white') if val > 15 else (val + 3, col)
+        t = ax2.text(pos, y_p, f"{val}%", ha='center', va='top' if val > 15 else 'bottom', fontsize=7.5, fontweight='bold', color=c)
+        if c == 'white': t.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#333')])
+        else: t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
 
     # --- 하단 심층 분석 박스 ---
     rect_diag = plt.Rectangle((0.08, 0.12), 0.84, 0.35, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
@@ -197,7 +198,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         diag_combined += "전반적인 단원 성취도가 고르게 나타나고 있습니다."
 
     # 4. 향후 솔루션
-    weak_list = u_res[u_res < 60].index.tolist()
+    weak_list = u_res[u_res < 40].index.tolist()
     if weak_list:
         sol_text = f"{student_name} 학생은 {', '.join([f'<{u}>' for u in weak_list])} 단원에 대한 철저한 오답 분석이 최우선 과제입니다. JEET만의 맞춤 솔루션인 JEET CARE+와 JDM(JEET DAILY MAKE UP) 시스템을 적극 활용하여 발견된 취약점을 빈틈없이 메워 나가며 다음 단계로의 도약을 준비하겠습니다." 
     else:
@@ -217,7 +218,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         # 2. 본문 출력
         ctxt = fig.text(0.11, curr_y - 0.015, wrapped_content, fontsize=8.2, linespacing=1.6, va='top', color='#333')
         
-        # 3. 다음 섹션 시작 위치 계산 
+        # 3. 다음 섹션 시작 위치 계산
         num_lines = len(wrapped_content.split('\n'))
         curr_y -= (0.045 + (num_lines * 0.013))
 
