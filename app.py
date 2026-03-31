@@ -45,21 +45,30 @@ def get_supabase_client() -> Client:
 def fetch_all_dataframes():
     supabase = get_supabase_client()
     
-    # Test_Info 테이블에서 데이터 가져오기
     info_res = supabase.table("Test_Info").select("*").execute()
     df_info = pd.DataFrame(info_res.data)
     
-    # Student_Results 테이블에서 데이터 가져오기
     results_res = supabase.table("Student_Results").select("*").execute()
     df_results = pd.DataFrame(results_res.data)
     
+    # --- [이 부분을 수정합니다] ---
+    if not df_results.empty:
+        # 1. 이름 컬럼을 문자열로 변환하고 양옆 공백 제거
+        df_results['이름'] = df_results['이름'].astype(str).str.strip()
+        # 2. 이름이 없거나 '0.0', '0', 'nan'인 유령 데이터들만 골라서 삭제
+        df_results = df_results[
+            (df_results['이름'] != '') & 
+            (df_results['이름'] != '0') & 
+            (df_results['이름'] != '0.0') & 
+            (df_results['이름'] != 'nan') &
+            (df_results['이름'].notna())
+        ]
+        # 3. 반 정보에 0.0이나 0이 들어가 있으면 빈 칸으로 청소
+        df_results['반'] = df_results['반'].astype(str).str.replace('0.0', '').replace('0', '').replace('nan', '').str.strip()
+    # -----------------------------
+    
     df_results = df_results.replace('', 0).fillna(0)
     return df_info, df_results
-
-def load_data():
-    df_info, df_results = fetch_all_dataframes()
-    # 기존 인터페이스 유지를 위해 빈 값 반환
-    return None, None, None, df_info, df_results
 
 
 # --- 3. 공통 그래프 그리기 함수 (기존 로직 100% 동일) ---
@@ -346,8 +355,13 @@ with tab2:
 with tab3:
     st.subheader("반별 일괄 출력")
     if '반' in df_results_all.columns:
-        all_classes = df_results_all['반'].astype(str).str.strip().unique().tolist()
-        class_list = sorted([c for c in all_classes if c and c not in ['0', 'nan']])
+        # --- [이 부분을 수정합니다] ---
+        # 선택한 시험 과정에 실제로 존재하는 '반'만 가져오고, 빈 칸('')은 목록에서 뺍니다.
+        current_test_results = df_results_all[df_results_all['시험명'] == selected_test]
+        all_classes = current_test_results['반'].astype(str).str.strip().unique().tolist()
+        class_list = sorted([c for c in all_classes if c and c != ''])
+        # -----------------------------
+        
         if class_list:
             target_c = st.selectbox("반 선택:", class_list)
             students = df_results_all[(df_results_all['시험명'] == selected_test) & (df_results_all['반'].astype(str).str.strip() == target_c)]['이름'].astype(str).str.strip().tolist()
