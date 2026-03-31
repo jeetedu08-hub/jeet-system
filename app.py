@@ -90,20 +90,17 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
     txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
 
-    # --- 방사형 그래프 ---
+    # --- 방사형 그래프 (평균 제거됨) ---
     ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
     all_cats = cat_ratio.index.tolist()
     ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
     s_ordered = cat_ratio.reindex(ordered_labels)
-    a_ordered = avg_cat_ratio.reindex(ordered_labels)
     labels = s_ordered.index.tolist()
     s_vals = s_ordered.values.tolist() + [s_ordered.values[0]]
-    a_vals = a_ordered.values.tolist() + [a_ordered.values[0]]
     angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False).tolist() + [0]
     
     ax1.set_theta_direction(-1); ax1.set_theta_offset(np.pi/2.0)
-    ax1.plot(angles, a_vals, color=COLOR_AVG, linewidth=1, linestyle='--', label='전체 평균')
-    ax1.fill(angles, a_vals, color=COLOR_AVG, alpha=0.1)
+    # 평균 그래프 제거
     ax1.plot(angles, s_vals, color=COLOR_STUDENT, linewidth=2.5, label='학생 점수')
     ax1.set_ylim(0, 110); ax1.set_xticks(angles[:-1]); ax1.set_xticklabels([]); ax1.set_yticklabels([]) 
     
@@ -112,18 +109,21 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         ha, va, dist = ('center', 'bottom', 115) if angle == 0 else ('left', 'center', 110) if 0 < angle < np.pi else ('center', 'top', 115) if angle == np.pi else ('right', 'center', 110)
         if '문제\n해결력' in label_text: dist += 10; ha = 'left' if 0 < angle < np.pi else 'right'
         ax1.text(angle, dist, label_text, fontsize=10, fontweight='bold', va=va, ha=ha, color=COLOR_NAVY)
-        s_v, a_v = int(s_vals[i]), int(a_vals[i])
+        s_v = int(s_vals[i])
         td = (s_v - 15 if s_v > 30 else s_v + 15) if '문제\n해결력' in label_text else (s_v + 10 if s_v < 85 else s_v - 18)
-        txt_s = ax1.text(angle, td, f"{s_v}%", fontsize=9, fontweight='bold', color=COLOR_STUDENT, va='center', ha='right')
-        txt_a = ax1.text(angle, td, f" ({a_v}%)", fontsize=9, fontweight='bold', color=COLOR_RED, va='center', ha='left')
-        for t in [txt_s, txt_a]: t.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
+        
+        # 텍스트 ha를 'center'로 수정하여 점 위에 예쁘게 올라가도록 처리 (평균 수치 제거됨)
+        txt_s = ax1.text(angle, td, f"{s_v}%", fontsize=9, fontweight='bold', color=COLOR_STUDENT, va='center', ha='center')
+        txt_s.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
     
     ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
     title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
-    fig.text(0.26, 0.49, "(파란색: 학생 성취율 / 빨간색: 전체 평균 성취율)", ha='center', fontsize=9, color='#555')
+    
+    # 평균 안내 문구 제거
+    fig.text(0.26, 0.49, "(파란색: 학생 성취율)", ha='center', fontsize=9, color='#555')
 
-    # --- 단원별 성취도 그래프 ---
+    # --- 단원별 성취도 그래프 (기존 유지) ---
     ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
     x_pos = np.arange(len(unit_data)); bar_width = 0.35 
     s_pct = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
@@ -179,8 +179,8 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 
     diag_combined = ""
     if c_best: diag_combined += f"특히 {', '.join([f'[{c}]' for c in c_best])} 영역에서 높은 이해도와 응용력을 보이며 탁월한 강점을 나타내고 있습니다. 이 역영에서는 지속적으로 성취도를 유지할 수 있도록 연습이 필요합니다. "
-    if c_good: diag_combined += f"{', '.join([f'[{c}]' for c in c_good])} 영역 역시 양호한 정답률을 유지하며 탄탄한 기본기를 증명했지만 실수를 줄이는 연습과 심화적인 부분의 학습이 필요합니다. "
-    if c_weak: diag_combined += f"{', '.join([f'[{c}]' for c in c_weak])} 영역은 문제를 풀어내는데에 있어서 개념 적용에 있어 다소 아쉬움이 남습니다. 영역에 해당하는 개념, 응용 문제들을 해결하면서 정밀한 보완이 필요합니다. "
+    if c_good: diag_combined += f" {', '.join([f'[{c}]' for c in c_good])} 영역 역시 양호한 정답률을 유지하며 탄탄한 기본기를 증명했지만 실수를 줄이는 연습과 심화적인 부분의 학습이 필요합니다. "
+    if c_weak: diag_combined += f"다만, {', '.join([f'[{c}]' for c in c_weak])} 영역은 복합 개념 적용에 있어 다소 아쉬움이 남습니다. 영역에 해당하는 개념, 응용 문제들을 해결하면서 정밀한 보완이 필요합니다. "
     if c_warn: diag_combined += f"무엇보다 {', '.join([f'[{c}]' for c in c_warn])} 영역은 기본적인 개념부터 다시 집중적으로 연습하여 성취도를 끌어올릴 수 있는 재학습이 필요해 보입니다. "
 
     # 3. 단원별 분석
@@ -197,7 +197,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         diag_combined += "전반적인 단원 성취도가 고르게 나타나고 있습니다."
 
     # 4. 향후 솔루션
-    weak_list = u_res[u_res < 40].index.tolist()
+    weak_list = u_res[u_res < 60].index.tolist()
     if weak_list:
         sol_text = f"{student_name} 학생은 {', '.join([f'<{u}>' for u in weak_list])} 단원에 대한 철저한 오답 분석이 최우선 과제입니다. JEET만의 맞춤 솔루션인 JEET CARE+와 JDM(JEET DAILY MAKE UP) 시스템을 적극 활용하여 발견된 취약점을 빈틈없이 메워 나가며 다음 단계로의 도약을 준비하겠습니다." 
     else:
@@ -205,7 +205,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 
     sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", diag_combined), ("[JEET 맞춤 솔루션]", sol_text)]
 
-    # ✨ 텍스트 레이아웃 출력부 동적 튜닝 ✨ (내용과 다음 제목 사이에 여백 추가)
+    # ✨ 텍스트 레이아웃 출력부 동적 튜닝 ✨ 
     curr_y = 0.415 
     for subtitle, content in sections:
         # 1. 소제목 출력
@@ -214,11 +214,10 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         
         wrapped_content = textwrap.fill(content, width=65)
         
-        # 2. 본문 출력 (제목 바로 아래에 예쁘게 붙여서 출력되도록 0.015 간격 복구)
+        # 2. 본문 출력
         ctxt = fig.text(0.11, curr_y - 0.015, wrapped_content, fontsize=8.2, linespacing=1.6, va='top', color='#333')
         
-        # 3. 다음 섹션 시작 위치 계산 (여기서 한 줄 띄우기!)
-        # 본문이 차지하는 공간(num_lines * 0.013) + 다음 제목까지의 여백(0.045)을 더해 크게 띄워줍니다.
+        # 3. 다음 섹션 시작 위치 계산 
         num_lines = len(wrapped_content.split('\n'))
         curr_y -= (0.045 + (num_lines * 0.013))
 
