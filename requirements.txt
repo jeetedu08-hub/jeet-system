@@ -1,10 +1,2 @@
 streamlit
-pandas
-matplotlib
-numpy
-gspread
-oauth2client
-openpyxl
-streamlit
-pandas
-st-gsheets-connection
+supabase
