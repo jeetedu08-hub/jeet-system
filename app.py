@@ -90,7 +90,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
     txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
 
-    # --- 방사형 그래프 (평균 제거됨) ---
+    # --- 방사형 그래프 (크기 자동 조절) ---
     ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
     all_cats = cat_ratio.index.tolist()
     ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
@@ -99,18 +99,29 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     s_vals = s_ordered.values.tolist() + [s_ordered.values[0]]
     angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False).tolist() + [0]
     
+    # ✨ 방사형 그래프 동적 스케일링: 학생의 최고 점수를 기준으로 한도를 정함 ✨
+    max_s_val = max(s_vals) if len(s_vals) > 0 else 0
+    ax1_limit = max(45, min(110, max_s_val + (max_s_val * 0.25) + 10)) # 최소 45%, 상단 여유 확보
+    
     ax1.set_theta_direction(-1); ax1.set_theta_offset(np.pi/2.0)
     ax1.plot(angles, s_vals, color=COLOR_STUDENT, linewidth=2.5, label='학생 점수')
-    ax1.set_ylim(0, 110); ax1.set_xticks(angles[:-1]); ax1.set_xticklabels([]); ax1.set_yticklabels([]) 
+    ax1.set_ylim(0, ax1_limit); ax1.set_xticks(angles[:-1]); ax1.set_xticklabels([]); ax1.set_yticklabels([]) 
     
     for i in range(len(labels)):
         angle = angles[i]; label_text = labels[i]
-        ha, va, dist = ('center', 'bottom', 115) if angle == 0 else ('left', 'center', 110) if 0 < angle < np.pi else ('center', 'top', 115) if angle == np.pi else ('right', 'center', 110)
-        if '문제\n해결력' in label_text: dist += 10; ha = 'left' if 0 < angle < np.pi else 'right'
-        ax1.text(angle, dist, label_text, fontsize=10, fontweight='bold', va=va, ha=ha, color=COLOR_NAVY)
-        s_v = int(s_vals[i])
-        td = (s_v - 15 if s_v > 30 else s_v + 15) if '문제\n해결력' in label_text else (s_v + 10 if s_v < 85 else s_v - 18)
         
+        # 글자 위치도 확대/축소 비율에 맞춰서 물리적으로 일정한 위치에 배치되도록 수정
+        base_dist = ax1_limit * 1.15
+        ha, va, dist = ('center', 'bottom', base_dist) if angle == 0 else ('left', 'center', base_dist) if 0 < angle < np.pi else ('center', 'top', base_dist) if angle == np.pi else ('right', 'center', base_dist)
+        if '문제\n해결력' in label_text: 
+            dist += (ax1_limit * 0.1)
+            ha = 'left' if 0 < angle < np.pi else 'right'
+            
+        ax1.text(angle, dist, label_text, fontsize=10, fontweight='bold', va=va, ha=ha, color=COLOR_NAVY)
+        
+        s_v = int(s_vals[i])
+        # 점수 텍스트는 겹치지 않게 바깥쪽/안쪽으로 동적 띄어쓰기
+        td = s_v - (ax1_limit * 0.12) if s_v > ax1_limit * 0.85 else s_v + (ax1_limit * 0.12)
         txt_s = ax1.text(angle, td, f"{s_v}%", fontsize=9, fontweight='bold', color=COLOR_STUDENT, va='center', ha='center')
         txt_s.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
     
@@ -120,33 +131,34 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     
     fig.text(0.26, 0.49, "(파란색: 학생 성취율)", ha='center', fontsize=9, color='#555')
 
-    # --- 단원별 성취도 그래프 (평균 제거 및 중앙 정렬) ---
+    # --- 단원별 성취도 그래프 (크기 자동 조절) ---
     ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
     x_pos = np.arange(len(unit_data))
-    bar_width = 0.45 # 단일 막대이므로 너비를 약간 더 키워 안정감 있게 변경
+    bar_width = 0.45 
     s_pct = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
     
-    # 평균(a_pct) 및 평균 막대 그리기 삭제, 학생 막대만 중앙(x_pos)에 배치
+    # ✨ 막대 그래프 동적 스케일링: 눈금이 너무 높아서 막대가 바닥에 붙는 현상 해결 ✨
+    max_b_val = s_pct.max() if not s_pct.empty else 0
+    ax2_limit = max(40, min(110, max_b_val + (max_b_val * 0.25) + 15)) # 최고점에 비례해 유동적 여백 제공
+    
     ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3)
     
     ax2.set_xticks(x_pos); ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
     ax2.tick_params(axis='x', which='both', length=0) 
-    ax2.set_ylim(0, 110); ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
+    ax2.set_ylim(0, ax2_limit); ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
     title2 = ax2.set_title("▶ 단원별 성취도 (%)", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
     
-    # 평균 관련 안내 텍스트 삭제
     fig.text(0.725, 0.485, "(파란색: 학생 성취율)", ha='center', fontsize=8.5, color='#555')
     
-    # 학생 점수 텍스트만 출력하도록 루프 수정
     for i in range(len(x_pos)):
         val = int(s_pct.iloc[i])
         pos = x_pos[i]
-        col = COLOR_STUDENT
-        y_p, c = (val - 3, 'white') if val > 15 else (val + 3, col)
-        t = ax2.text(pos, y_p, f"{val}%", ha='center', va='top' if val > 15 else 'bottom', fontsize=7.5, fontweight='bold', color=c)
-        if c == 'white': t.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#333')])
-        else: t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
+        
+        # 막대 위쪽에 일정한 비율로 텍스트 예쁘게 배치
+        y_p = val + (ax2_limit * 0.04)
+        t = ax2.text(pos, y_p, f"{val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_STUDENT)
+        t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
 
     # --- 하단 심층 분석 박스 ---
     rect_diag = plt.Rectangle((0.08, 0.12), 0.84, 0.35, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
@@ -198,7 +210,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         diag_combined += "전반적인 단원 성취도가 고르게 나타나고 있습니다."
 
     # 4. 향후 솔루션
-    weak_list = u_res[u_res < 40].index.tolist()
+    weak_list = u_res[u_res < 60].index.tolist()
     if weak_list:
         sol_text = f"{student_name} 학생은 {', '.join([f'<{u}>' for u in weak_list])} 단원에 대한 철저한 오답 분석이 최우선 과제입니다. JEET만의 맞춤 솔루션인 JEET CARE+와 JDM(JEET DAILY MAKE UP) 시스템을 적극 활용하여 발견된 취약점을 빈틈없이 메워 나가며 다음 단계로의 도약을 준비하겠습니다." 
     else:
