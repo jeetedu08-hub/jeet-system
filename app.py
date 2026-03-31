@@ -160,11 +160,11 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     avg_val, total_avg_val = int(cat_ratio.mean()), int(avg_cat_ratio.mean())
     
     # 1. 총평
-    if avg_val >= 90:
+    if avg_val >= 80:
         eval_tier = "심화 개념까지 완벽히 소화하며 탁월한 수학적 직관력을 보여주는 최상위 수준의 성취도"
-    elif avg_val >= 75:
-        eval_tier = "안정적인 기본기를 바탕으로 성실한 학습 태도가 돋보이는 우수한 성취도"
     elif avg_val >= 60:
+        eval_tier = "안정적인 기본기를 바탕으로 성실한 학습 태도가 돋보이는 우수한 성취도"
+    elif avg_val >= 20:
         eval_tier = "핵심 개념을 정립해 나가며 꾸준한 성장이 기대되는 도약 단계의 성취도"
     else:
         eval_tier = "수학적 기초 체력을 다지며 자신감을 키워가야 하는 잠재력 발현 단계의 성취도"
@@ -173,26 +173,26 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 
     # 2. 영역별 분석
     c_best = cat_ratio[cat_ratio >= 80].index.str.replace('\n', '').tolist()
-    c_good = cat_ratio[(cat_ratio >= 60) & (cat_ratio < 80)].index.str.replace('\n', '').tolist()
-    c_weak = cat_ratio[(cat_ratio >= 40) & (cat_ratio < 60)].index.str.replace('\n', '').tolist()
-    c_warn = cat_ratio[cat_ratio < 40].index.str.replace('\n', '').tolist()
+    c_good = cat_ratio[(cat_ratio >= 50) & (cat_ratio < 80)].index.str.replace('\n', '').tolist()
+    c_weak = cat_ratio[(cat_ratio >= 20) & (cat_ratio < 50)].index.str.replace('\n', '').tolist()
+    c_warn = cat_ratio[cat_ratio < 20].index.str.replace('\n', '').tolist()
 
     diag_combined = ""
-    if c_best: diag_combined += f"특히 {', '.join([f'[{c}]' for c in c_best])} 영역에서 높은 이해도와 응용력을 보이며 탁월한 강점을 나타내고 있습니다. "
-    if c_good: diag_combined += f"더불어 {', '.join([f'[{c}]' for c in c_good])} 영역 역시 양호한 정답률을 유지하며 탄탄한 기본기를 증명했습니다. "
-    if c_weak: diag_combined += f"다만, {', '.join([f'[{c}]' for c in c_weak])} 영역은 복합 개념 적용에 있어 다소 아쉬움이 남아 정밀한 보완이 요구됩니다. "
-    if c_warn: diag_combined += f"무엇보다 {', '.join([f'[{c}]' for c in c_warn])} 영역은 근본적인 원리부터 다시 점검하는 집중적인 재학습이 필요해 보입니다. "
+    if c_best: diag_combined += f"특히 {', '.join([f'[{c}]' for c in c_best])} 영역에서 높은 이해도와 응용력을 보이며 탁월한 강점을 나타내고 있습니다. 이 역영에서는 지속적으로 성취도를 유지할 수 있도록 연습이 필요합니다. "
+    if c_good: diag_combined += f" {', '.join([f'[{c}]' for c in c_good])} 영역 역시 양호한 정답률을 유지하며 탄탄한 기본기를 증명했지만 실수를 줄이는 연습과 심화적인 부분의 학습이 필요합니다. "
+    if c_weak: diag_combined += f"다만, {', '.join([f'[{c}]' for c in c_weak])} 영역은 복합 개념 적용에 있어 다소 아쉬움이 남습니다. 영역에 해당하는 개념, 응용 문제들을 해결하면서 정밀한 보완이 필요합니다. "
+    if c_warn: diag_combined += f"무엇보다 {', '.join([f'[{c}]' for c in c_warn])} 영역은 기본적인 개념부터 다시 집중적으로 연습하여 성취도를 끌어올릴 수 있는 재학습이 필요해 보입니다. "
 
     # 3. 단원별 분석
     g_best = u_res[u_res >= 80].index.tolist()
-    g_good = u_res[(u_res >= 60) & (u_res < 80)].index.tolist()
-    g_weak = u_res[(u_res >= 40) & (u_res < 60)].index.tolist()
-    g_warn = u_res[u_res < 40].index.tolist()
+    g_good = u_res[(u_res >= 50) & (u_res < 80)].index.tolist()
+    g_weak = u_res[(u_res >= 20) & (u_res < 50)].index.tolist()
+    g_warn = u_res[u_res < 20].index.tolist()
 
-    if g_best: diag_combined += f"세부 단원별로는 {', '.join([f'<{u}>' for u in g_best])} 단원의 완성도가 매우 훌륭합니다. "
-    if g_good: diag_combined += f"{', '.join([f'<{u}>' for u in g_good])} 단원은 안정적인 궤도에 올랐으나 약간의 응용력 보강이 남았습니다. "
-    if g_weak: diag_combined += f"{', '.join([f'<{u}>' for u in g_weak])} 단원은 잦은 실수가 발생하는 취약 유형에 대한 집중 분석이 필요합니다. "
-    if g_warn: diag_combined += f"{', '.join([f'<{u}>' for u in g_warn])} 단원은 기초부터 다시 다지는 맞춤형 클리닉이 선행되어야 합니다."
+    if g_best: diag_combined += f"세부 단원별로는 {', '.join([f'<{u}>' for u in g_best])} 단원의 완성도가 매우 훌륭합니다. 이 단원에서는 신유형 위주의 학습을 하며 성취도를 유지할 필요가 있습니다. "
+    if g_good: diag_combined += f"{', '.join([f'<{u}>' for u in g_good])} 단원은 안정적인 궤도에 올랐으나 심화적인 부분에서 아쉬운 부분이 있으니 심화 위주의 학습을 하면서 성취도를 끌어올릴 필요가 있습니다. "
+    if g_weak: diag_combined += f"{', '.join([f'<{u}>' for u in g_weak])} 단원은 오답이 발생하는 취약 유형에 대한 재학습을 하면서 오답을 줄이고, 난이도가 있는 문제들을 해결하면서 유형에 대한 연습이 필요합니다. "
+    if g_warn: diag_combined += f"{', '.join([f'<{u}>' for u in g_warn])} 단원은 기초부터 다시 다지면서 쉬운 유형들에 대한 연습을 하면서 틀린 문제에 대한 맞춤형 클리닉 진행이 필요합니다."
     if not (g_best or g_good or g_weak or g_warn):
         diag_combined += "전반적인 단원 성취도가 고르게 나타나고 있습니다."
 
