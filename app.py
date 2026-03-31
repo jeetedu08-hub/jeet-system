@@ -8,10 +8,9 @@ import matplotlib.font_manager as fm
 import matplotlib.patheffects as path_effects
 import traceback
 import streamlit as st
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import io
 import json
+from supabase import create_client, Client
 
 # --- 1. 환경 및 폰트 설정 (에러 방지 안전장치 추가) ---
 font_path = "malgun.ttf"
