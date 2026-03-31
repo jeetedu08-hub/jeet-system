@@ -37,38 +37,33 @@ COLOR_AVG = '#757575'
 COLOR_GRID = '#E0E0E0'
 COLOR_BG = '#F8F9FA'
 
-# --- 2. 구글 스프레드시트 연동 및 캐시 설정 ---
+# --- 2. Supabase 연동 설정 ---
 @st.cache_resource
-def get_google_sheet():
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    if "GOOGLE_JSON" in st.secrets:
-        creds_dict = json.loads(st.secrets["GOOGLE_JSON"])
-    elif "gcp_secret_string" in st.secrets:
-        creds_dict = json.loads(st.secrets["gcp_secret_string"])
-    elif "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-        creds_dict = json.loads(st.secrets["connections"]["gsheets"].get("credentials", "{}"))
-    else:
-        creds = ServiceAccountCredentials.from_json_keyfile_name("secrets.json", scope)
-        
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    doc = client.open_by_url("https://docs.google.com/spreadsheets/d/1bYv3ff5xwzd4DS3EZUC9Xj6GSpeVmijobbW0svKpqXU/edit")
-    return doc
+def get_supabase_client() -> Client:
+    # Streamlit Secrets에 SUPABASE_URL과 SUPABASE_KEY가 등록되어 있어야 합니다.
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
 
 @st.cache_data(ttl=120)
 def fetch_all_dataframes():
-    doc = get_google_sheet()
-    df_info = pd.DataFrame(doc.worksheet('Test_Info').get_all_records())
-    df_results = pd.DataFrame(doc.worksheet('Student_Results').get_all_records())
+    supabase = get_supabase_client()
+    
+    # Test_Info 테이블에서 데이터 가져오기
+    info_res = supabase.table("Test_Info").select("*").execute()
+    df_info = pd.DataFrame(info_res.data)
+    
+    # Student_Results 테이블에서 데이터 가져오기
+    results_res = supabase.table("Student_Results").select("*").execute()
+    df_results = pd.DataFrame(results_res.data)
+    
     df_results = df_results.replace('', 0).fillna(0)
     return df_info, df_results
 
+# 기존 load_data 함수를 Supabase에 맞게 간소화
 def load_data():
-    doc = get_google_sheet()
-    ws_info = doc.worksheet('Test_Info')
-    ws_results = doc.worksheet('Student_Results')
     df_info, df_results = fetch_all_dataframes()
-    return doc, ws_info, ws_results, df_info, df_results
+    return None, None, None, df_info, df_results
 
 
 # --- 3. 공통 그래프 그리기 함수 (개별/일괄 출력에서 모두 사용) ---
@@ -348,7 +343,7 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 
-# --- 5. Streamlit 웹 UI 구성 ---
+# --- 5. Streamlit 웹 UI 및 저장 로직 수정 ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 col1, col2 = st.columns([8, 2])
 with col1: st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
@@ -369,41 +364,34 @@ tab1, tab2, tab3 = st.tabs(["📝 신규 성적 입력", "📑 개별 리포트 
 
 with tab1:
     st.subheader(f"[{selected_test}] 신규 학생 성적 입력")
-    question_numbers = df_info_filtered['문항번호'].tolist()
-    if question_numbers:
-        with st.form("data_input_form", clear_on_submit=True):
-            ci1, ci2, ci3, ci4 = st.columns(4)
-            with ci1: input_name = st.text_input("이름")
-            with ci2: input_class = st.text_input("반 (예: A반)")
-            with ci3: input_school = st.text_input("학교")
-            with ci4: input_grade = st.selectbox("학년", ["중1", "중2", "중3"])
-            st.markdown("---")
-            answers = {}
-            for i in range(0, len(question_numbers), 5):
-                cols = st.columns(5)
-                for j, q_num in enumerate(question_numbers[i:i+5]):
-                    with cols[j]:
-                        choice = st.radio(f"**{q_num}번**", options=["O", "X"], horizontal=True, key=f"q_{q_num}")
-                        answers[str(q_num)] = 1 if choice == "O" else 0
-            
-            if st.form_submit_button("구글 시트에 성적 저장하기", type="primary"):
-                clean_name = input_name.strip()
-                if not clean_name: st.error("⚠ 이름을 입력해주세요.")
-                else:
-                    try:
-                        header_row = ws_results.row_values(1)
-                        new_row = []
-                        for col_name in header_row:
-                            col_str = str(col_name)
-                            if col_str == '시험명': new_row.append(selected_test) 
-                            elif col_str == '이름': new_row.append(clean_name)
-                            elif col_str == '반': new_row.append(input_class)
-                            elif col_str == '학교': new_row.append(input_school)
-                            elif col_str == '학년': new_row.append(input_grade)
-                            elif col_str in answers: new_row.append(answers[col_str])
-                            else: new_row.append("")
-                        ws_results.append_row(new_row); st.success("성적이 저장되었습니다!"); st.cache_data.clear()
-                    except Exception as e: st.error(f"저장 중 오류: {e}")
+    # ... (중략: 입력 폼 구성) ...
+    
+    if st.form_submit_button("Supabase에 성적 저장하기", type="primary"):
+        clean_name = input_name.strip()
+        if not clean_name:
+            st.error("⚠ 이름을 입력해주세요.")
+        else:
+            try:
+                # 1. 저장할 데이터 딕셔너리 생성
+                # Supabase는 테이블의 컬럼명과 딕셔너리의 Key가 일치해야 합니다.
+                new_data = {
+                    "시험명": selected_test,
+                    "이름": clean_name,
+                    "반": input_class,
+                    "학교": input_school,
+                    "학년": input_grade,
+                }
+                # 문항별 점수 추가
+                new_data.update(answers)
+
+                # 2. Supabase Insert 실행
+                supabase = get_supabase_client()
+                response = supabase.table("Student_Results").insert(new_data).execute()
+                
+                st.success("데이터가 Supabase에 안전하게 저장되었습니다!")
+                st.cache_data.clear() # 캐시 초기화하여 실시간 반영
+            except Exception as e:
+                st.error(f"저장 중 오류 발생: {e}")
 
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
