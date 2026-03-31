@@ -205,14 +205,21 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 
     sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", diag_combined), ("[JEET 맞춤 솔루션]", sol_text)]
 
-    # 텍스트 레이아웃 출력부 (기존 로직 유지)
-    curr_y, base_spacing = 0.41, 0.08
+    # ✨ 텍스트 레이아웃 출력부 동적 튜닝 ✨ (여기서 텍스트 짤림 문제를 해결했습니다)
+    curr_y = 0.415 # 시작 위치를 박스 상단 여백을 고려해 미세조정
     for subtitle, content in sections:
         stxt = fig.text(0.11, curr_y, subtitle, fontsize=9.5, fontweight='bold', color='#222')
         stxt.set_path_effects([path_effects.withStroke(linewidth=0.5, foreground='#222')])
-        wrapped_content = textwrap.fill(content, width=64)
-        ctxt = fig.text(0.11, curr_y - 0.012, wrapped_content, fontsize=8.8, linespacing=1.5, va='top', color='#333')
-        curr_y -= (base_spacing + (len(wrapped_content.split('\n')) - 1) * 0.014)
+        
+        # width를 늘려 가로 공간을 최대한 활용하여 전체 줄 수를 줄임 (64 -> 76)
+        wrapped_content = textwrap.fill(content, width=76)
+        
+        # 본문 폰트 크기를 미세하게 줄이고 줄간격을 최적화 (fontsize 8.5)
+        ctxt = fig.text(0.11, curr_y - 0.015, wrapped_content, fontsize=8.5, linespacing=1.6, va='top', color='#333')
+        
+        # 다음 문단 시작 위치를 실제 줄 수에 비례하여 정확하게 차감 (기본 여백 축소)
+        num_lines = len(wrapped_content.split('\n'))
+        curr_y -= (0.035 + (num_lines * 0.014))
 
     line_footer = plt.Line2D([0.05, 0.95], [0.10, 0.10], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure); fig.lines.append(line_footer)
     campuses = [("수지 캠퍼스: 276-8003", "풍덕천로 129번길 16-1"), ("죽전 캠퍼스: 263-8003", "기흥구 죽현로 29"), ("광교 캠퍼스: 257-8003", "영통구 혜명로 10")]
