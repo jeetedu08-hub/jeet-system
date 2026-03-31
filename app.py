@@ -205,21 +205,21 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 
     sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", diag_combined), ("[JEET 맞춤 솔루션]", sol_text)]
 
-    # ✨ 텍스트 레이아웃 출력부 동적 튜닝 ✨ (여기서 텍스트 짤림 문제를 해결했습니다)
-    curr_y = 0.415 # 시작 위치를 박스 상단 여백을 고려해 미세조정
+    # ✨ 텍스트 레이아웃 출력부 동적 튜닝 ✨ (가로 짤림, 세로 짤림 동시 해결)
+    curr_y = 0.415 
     for subtitle, content in sections:
         stxt = fig.text(0.11, curr_y, subtitle, fontsize=9.5, fontweight='bold', color='#222')
         stxt.set_path_effects([path_effects.withStroke(linewidth=0.5, foreground='#222')])
         
-        # width를 늘려 가로 공간을 최대한 활용하여 전체 줄 수를 줄임 (64 -> 76)
-        wrapped_content = textwrap.fill(content, width=76)
+        # 가로 삐져나감을 막기 위해 한 줄 글자수를 안전한 범위인 65로 복구합니다.
+        wrapped_content = textwrap.fill(content, width=65)
         
-        # 본문 폰트 크기를 미세하게 줄이고 줄간격을 최적화 (fontsize 8.5)
-        ctxt = fig.text(0.11, curr_y - 0.015, wrapped_content, fontsize=8.5, linespacing=1.6, va='top', color='#333')
+        # 폰트 크기를 8.2로 약간 더 줄여 세로 공간을 확보합니다.
+        ctxt = fig.text(0.11, curr_y - 0.015, wrapped_content, fontsize=8.2, linespacing=1.6, va='top', color='#333')
         
-        # 다음 문단 시작 위치를 실제 줄 수에 비례하여 정확하게 차감 (기본 여백 축소)
+        # 세로로 삐져나가는 것을 막기 위해 다음 문단으로 넘어가는 '여백(offset)'을 더 작게 압축합니다.
         num_lines = len(wrapped_content.split('\n'))
-        curr_y -= (0.035 + (num_lines * 0.014))
+        curr_y -= (0.032 + (num_lines * 0.013))
 
     line_footer = plt.Line2D([0.05, 0.95], [0.10, 0.10], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure); fig.lines.append(line_footer)
     campuses = [("수지 캠퍼스: 276-8003", "풍덕천로 129번길 16-1"), ("죽전 캠퍼스: 263-8003", "기흥구 죽현로 29"), ("광교 캠퍼스: 257-8003", "영통구 혜명로 10")]
