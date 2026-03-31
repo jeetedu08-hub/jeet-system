@@ -365,7 +365,7 @@ test_list = df_info_all['시험명'].dropna().unique().tolist()
 selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
 df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 
-tab1, tab2, tab3 = st.tabs(["✍️ 성적 입력", "📊 개별 분석", "📚 일괄 출력"])
+tab1, tab2, tab3 = st.tabs(["✍️ 성적 입력", "📊 개별 리포트 출력", "📚 반별 일괄 리포트 출력"])
 
 with tab1:
     st.subheader(f"[{selected_test}] 신규 학생 성적 입력")
