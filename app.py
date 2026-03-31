@@ -29,8 +29,13 @@ except Exception as e:
 
 plt.rcParams['axes.unicode_minus'] = False
 
-COLOR_NAVY = '#1A237E'; COLOR_RED = '#D32F2F'; COLOR_STUDENT = '#0056B3'
-COLOR_AVG = '#757575'; COLOR_GRID = '#E0E0E0'; COLOR_BG = '#F8F9FA'
+COLOR_NAVY = '#1A237E'
+COLOR_RED = '#D32F2F'
+COLOR_STUDENT = '#0056B3'
+COLOR_UNIT = '#00796B'    # ✨ 단원별 그래프용 새로운 색상 (청록색) 추가
+COLOR_AVG = '#757575'
+COLOR_GRID = '#E0E0E0'
+COLOR_BG = '#F8F9FA'
 
 # --- 2. 구글 스프레드시트 연동 및 캐시 설정 ---
 @st.cache_resource
@@ -99,7 +104,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     s_vals = s_ordered.values.tolist() + [s_ordered.values[0]]
     angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False).tolist() + [0]
     
-    # ✨ 방사형 그래프 동적 스케일링: 학생의 최고 점수를 기준으로 한도를 정함 ✨
+    # 동적 스케일링: 학생의 최고 점수를 기준으로 한도를 정함
     max_s_val = max(s_vals) if len(s_vals) > 0 else 0
     ax1_limit = max(45, min(110, max_s_val + (max_s_val * 0.25) + 10)) # 최소 45%, 상단 여유 확보
     
@@ -125,11 +130,10 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         txt_s = ax1.text(angle, td, f"{s_v}%", fontsize=9, fontweight='bold', color=COLOR_STUDENT, va='center', ha='center')
         txt_s.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
     
-    ax1.legend(loc='upper right', bbox_to_anchor=(1.45, 1.15), fontsize=8, frameon=False)
     title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
     
-    fig.text(0.26, 0.49, "(파란색: 학생 성취율)", ha='center', fontsize=9, color='#555')
+    # ✨ (파란색: 학생 성취율) 문구 삭제됨 ✨
 
     # --- 단원별 성취도 그래프 (크기 자동 조절) ---
     ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
@@ -137,11 +141,12 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     bar_width = 0.45 
     s_pct = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
     
-    # ✨ 막대 그래프 동적 스케일링: 눈금이 너무 높아서 막대가 바닥에 붙는 현상 해결 ✨
+    # 막대 그래프 동적 스케일링: 눈금이 너무 높아서 막대가 바닥에 붙는 현상 해결
     max_b_val = s_pct.max() if not s_pct.empty else 0
     ax2_limit = max(40, min(110, max_b_val + (max_b_val * 0.25) + 15)) # 최고점에 비례해 유동적 여백 제공
     
-    ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3)
+    # ✨ 막대 색상 청록색(COLOR_UNIT)으로 변경 ✨
+    ax2.bar(x_pos, s_pct, color=COLOR_UNIT, alpha=0.9, width=bar_width, zorder=3)
     
     ax2.set_xticks(x_pos); ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
     ax2.tick_params(axis='x', which='both', length=0) 
@@ -149,7 +154,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     title2 = ax2.set_title("▶ 단원별 성취도 (%)", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
     
-    fig.text(0.725, 0.485, "(파란색: 학생 성취율)", ha='center', fontsize=8.5, color='#555')
+    # ✨ (파란색: 학생 성취율) 문구 삭제됨 ✨
     
     for i in range(len(x_pos)):
         val = int(s_pct.iloc[i])
@@ -157,7 +162,8 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         
         # 막대 위쪽에 일정한 비율로 텍스트 예쁘게 배치
         y_p = val + (ax2_limit * 0.04)
-        t = ax2.text(pos, y_p, f"{val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_STUDENT)
+        # ✨ 텍스트 색상 청록색(COLOR_UNIT)으로 통일 ✨
+        t = ax2.text(pos, y_p, f"{val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_UNIT)
         t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
 
     # --- 하단 심층 분석 박스 ---
@@ -241,7 +247,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         fig.text([0.22, 0.50, 0.78][i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
 
 
-# --- 4. 개별/일괄 데이터 처리 함수 ---
+# --- 4. 개별/일괄 데이터 처리 함수 (✨원래 로직으로 100% 복구✨) ---
 def prepare_report_data(selected_test):
     _, _, _, df_info, df_results = load_data()
     df_info = df_info[df_info['시험명'] == selected_test]
@@ -301,7 +307,7 @@ def generate_jeet_expert_report(target_name, selected_test):
         return True, pdf_buffer, "리포트 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
-# --- 반별 일괄 리포트 생성 함수 추가 (선택 필터링 및 공백 제거 강력 대응) ---
+# --- 반별 일괄 리포트 생성 함수 (✨원래 로직으로 100% 복구✨) ---
 def generate_batch_report(target_class, selected_test, selected_students=None):
     try:
         df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_int = prepare_report_data(selected_test)
@@ -344,7 +350,7 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 
-# --- 5. Streamlit 웹 UI 구성 ---
+# --- 5. Streamlit 웹 UI 구성 (✨원래 로직으로 100% 복구✨) ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 col1, col2 = st.columns([8, 2])
 with col1: st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
@@ -412,7 +418,7 @@ with tab2:
                 st.download_button("📥 PDF 다운로드", buf.getvalue(), f"{target_student}_리포트.pdf", "application/pdf")
             else: st.error(msg)
 
-# --- 탭 3: 학생 선택 기능이 포함된 일괄 리포트 출력 ---
+# --- 탭 3: 학생 선택 기능이 포함된 일괄 리포트 출력 (✨원래 로직으로 100% 복구✨) ---
 with tab3:
     st.subheader(f"[{selected_test}] 반별 전체 심층 분석 일괄 출력")
     
