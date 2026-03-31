@@ -197,7 +197,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         diag_combined += "전반적인 단원 성취도가 고르게 나타나고 있습니다."
 
     # 4. 향후 솔루션
-    weak_list = u_res[u_res < 60].index.tolist()
+    weak_list = u_res[u_res < 40].index.tolist()
     if weak_list:
         sol_text = f"{student_name} 학생은 {', '.join([f'<{u}>' for u in weak_list])} 단원에 대한 철저한 오답 분석이 최우선 과제입니다. JEET만의 맞춤 솔루션인 JEET CARE+와 JDM(JEET DAILY MAKE UP) 시스템을 적극 활용하여 발견된 취약점을 빈틈없이 메워 나가며 다음 단계로의 도약을 준비하겠습니다." 
     else:
@@ -205,21 +205,21 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 
     sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", diag_combined), ("[JEET 맞춤 솔루션]", sol_text)]
 
-    # ✨ 텍스트 레이아웃 출력부 동적 튜닝 ✨ (가로 짤림, 세로 짤림 동시 해결)
+    # ✨ 텍스트 레이아웃 출력부 동적 튜닝 ✨ (제목과 내용 사이 한 줄 띄어쓰기 추가)
     curr_y = 0.415 
     for subtitle, content in sections:
+        # 제목 출력
         stxt = fig.text(0.11, curr_y, subtitle, fontsize=9.5, fontweight='bold', color='#222')
         stxt.set_path_effects([path_effects.withStroke(linewidth=0.5, foreground='#222')])
         
-        # 가로 삐져나감을 막기 위해 한 줄 글자수를 안전한 범위인 65로 복구합니다.
         wrapped_content = textwrap.fill(content, width=65)
         
-        # 폰트 크기를 8.2로 약간 더 줄여 세로 공간을 확보합니다.
-        ctxt = fig.text(0.11, curr_y - 0.015, wrapped_content, fontsize=8.2, linespacing=1.6, va='top', color='#333')
+        # 본문 출력 (curr_y - 0.025 로 수정하여 소제목과 내용 사이에 한 줄 공간 확보)
+        ctxt = fig.text(0.11, curr_y - 0.025, wrapped_content, fontsize=8.2, linespacing=1.6, va='top', color='#333')
         
-        # 세로로 삐져나가는 것을 막기 위해 다음 문단으로 넘어가는 '여백(offset)'을 더 작게 압축합니다.
+        # 다음 섹션 시작 위치 계산 (위에서 내용이 더 아래로 내려간 만큼 0.032 -> 0.042 로 여유를 더 줌)
         num_lines = len(wrapped_content.split('\n'))
-        curr_y -= (0.032 + (num_lines * 0.013))
+        curr_y -= (0.042 + (num_lines * 0.013))
 
     line_footer = plt.Line2D([0.05, 0.95], [0.10, 0.10], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure); fig.lines.append(line_footer)
     campuses = [("수지 캠퍼스: 276-8003", "풍덕천로 129번길 16-1"), ("죽전 캠퍼스: 263-8003", "기흥구 죽현로 29"), ("광교 캠퍼스: 257-8003", "영통구 혜명로 10")]
