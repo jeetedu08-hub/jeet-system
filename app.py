@@ -31,8 +31,8 @@ plt.rcParams['axes.unicode_minus'] = False
 
 COLOR_NAVY = '#1A237E'
 COLOR_RED = '#D32F2F'
-COLOR_STUDENT = '#0056B3'
-COLOR_UNIT = '#00796B'    # ✨ 단원별 그래프용 새로운 색상 (청록색) 추가
+COLOR_STUDENT = '#0056B3' # 파란색
+COLOR_UNIT = '#00796B'    # 청록색 (현재 미사용)
 COLOR_AVG = '#757575'
 COLOR_GRID = '#E0E0E0'
 COLOR_BG = '#F8F9FA'
@@ -95,7 +95,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
     txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
 
-    # --- 방사형 그래프 (크기 자동 조절) ---
+    # --- 방사형 그래프 (크기 자동 조절 + 빨간색으로 변경) ---
     ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
     all_cats = cat_ratio.index.tolist()
     ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
@@ -109,13 +109,13 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     ax1_limit = max(45, min(110, max_s_val + (max_s_val * 0.25) + 10)) # 최소 45%, 상단 여유 확보
     
     ax1.set_theta_direction(-1); ax1.set_theta_offset(np.pi/2.0)
-    ax1.plot(angles, s_vals, color=COLOR_STUDENT, linewidth=2.5, label='학생 점수')
+    ax1.plot(angles, s_vals, color=COLOR_RED, linewidth=2.5, label='학생 점수')
     ax1.set_ylim(0, ax1_limit); ax1.set_xticks(angles[:-1]); ax1.set_xticklabels([]); ax1.set_yticklabels([]) 
     
     for i in range(len(labels)):
         angle = angles[i]; label_text = labels[i]
         
-        # ✨ [수정] 글자 위치를 그래프 바깥선에 예쁘게 밀착되도록 간격 대폭 축소 ✨
+        # 글자 위치를 그래프 바깥선에 예쁘게 밀착되도록 간격 대폭 축소
         dist_tb = ax1_limit * 1.05  # 위, 아래 글씨 간격
         dist_lr = ax1_limit * 1.02  # 양옆 글씨 간격
         
@@ -131,13 +131,13 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         s_v = int(s_vals[i])
         # 점수 텍스트는 겹치지 않게 바깥쪽/안쪽으로 동적 띄어쓰기
         td = s_v - (ax1_limit * 0.12) if s_v > ax1_limit * 0.85 else s_v + (ax1_limit * 0.12)
-        txt_s = ax1.text(angle, td, f"{s_v}%", fontsize=9, fontweight='bold', color=COLOR_STUDENT, va='center', ha='center')
+        txt_s = ax1.text(angle, td, f"{s_v}%", fontsize=9, fontweight='bold', color=COLOR_RED, va='center', ha='center')
         txt_s.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
     
     title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
 
-    # --- 단원별 성취도 그래프 (크기 자동 조절) ---
+    # --- 단원별 성취도 그래프 (크기 자동 조절 + 파란색으로 변경) ---
     ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
     x_pos = np.arange(len(unit_data))
     bar_width = 0.45 
@@ -147,7 +147,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     max_b_val = s_pct.max() if not s_pct.empty else 0
     ax2_limit = max(40, min(110, max_b_val + (max_b_val * 0.25) + 15)) # 최고점에 비례해 유동적 여백 제공
     
-    ax2.bar(x_pos, s_pct, color=COLOR_UNIT, alpha=0.9, width=bar_width, zorder=3)
+    ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3)
     
     ax2.set_xticks(x_pos); ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
     ax2.tick_params(axis='x', which='both', length=0) 
@@ -161,7 +161,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         
         # 막대 위쪽에 일정한 비율로 텍스트 예쁘게 배치
         y_p = val + (ax2_limit * 0.04)
-        t = ax2.text(pos, y_p, f"{val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_UNIT)
+        t = ax2.text(pos, y_p, f"{val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_STUDENT)
         t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
 
     # --- 하단 심층 분석 박스 ---
