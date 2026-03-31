@@ -174,7 +174,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     for t_obj in [t_p1, t_p2, t_p3]: t_obj.set_path_effects([path_effects.withStroke(linewidth=1, foreground=t_obj.get_color())])
     
     u_res = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
-    avg_val, total_avg_val = int(cat_ratio.mean()), int(avg_cat_ratio.mean())
+    avg_val = int(cat_ratio.mean())
     
     # 1. 총평
     if avg_val >= 80:
@@ -186,7 +186,8 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     else:
         eval_tier = "수학적 기초 체력을 다지며 자신감을 키워가야 하는 잠재력 발현 단계의 성취도"
         
-    diag_total = f"{student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."
+    # ✨ [수정] 전체 평균 부분 제거 ✨
+    diag_total = f"{student_name} 학생은 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."
 
     # 2. 영역별 분석
     c_best = cat_ratio[cat_ratio >= 80].index.str.replace('\n', '').tolist()
