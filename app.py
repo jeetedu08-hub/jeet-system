@@ -115,11 +115,15 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     for i in range(len(labels)):
         angle = angles[i]; label_text = labels[i]
         
-        # 글자 위치도 확대/축소 비율에 맞춰서 물리적으로 일정한 위치에 배치되도록 수정
-        base_dist = ax1_limit * 1.15
-        ha, va, dist = ('center', 'bottom', base_dist) if angle == 0 else ('left', 'center', base_dist) if 0 < angle < np.pi else ('center', 'top', base_dist) if angle == np.pi else ('right', 'center', base_dist)
+        # ✨ [수정] 글자 위치를 그래프 바깥선에 예쁘게 밀착되도록 간격 대폭 축소 ✨
+        dist_tb = ax1_limit * 1.05  # 위, 아래 글씨 간격
+        dist_lr = ax1_limit * 1.02  # 양옆 글씨 간격
+        
+        ha, va, dist = ('center', 'bottom', dist_tb) if angle == 0 else ('left', 'center', dist_lr) if 0 < angle < np.pi else ('center', 'top', dist_tb) if angle == np.pi else ('right', 'center', dist_lr)
+        
+        # 두 줄짜리 텍스트(문제해결력)일 경우에만 살짝 더 여백을 줌
         if '문제\n해결력' in label_text: 
-            dist += (ax1_limit * 0.1)
+            dist += (ax1_limit * 0.08)
             ha = 'left' if 0 < angle < np.pi else 'right'
             
         ax1.text(angle, dist, label_text, fontsize=10, fontweight='bold', va=va, ha=ha, color=COLOR_NAVY)
@@ -132,8 +136,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     
     title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
-    
-    # ✨ (파란색: 학생 성취율) 문구 삭제됨 ✨
 
     # --- 단원별 성취도 그래프 (크기 자동 조절) ---
     ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
@@ -145,7 +147,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     max_b_val = s_pct.max() if not s_pct.empty else 0
     ax2_limit = max(40, min(110, max_b_val + (max_b_val * 0.25) + 15)) # 최고점에 비례해 유동적 여백 제공
     
-    # ✨ 막대 색상 청록색(COLOR_UNIT)으로 변경 ✨
     ax2.bar(x_pos, s_pct, color=COLOR_UNIT, alpha=0.9, width=bar_width, zorder=3)
     
     ax2.set_xticks(x_pos); ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
@@ -154,15 +155,12 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     title2 = ax2.set_title("▶ 단원별 성취도 (%)", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
     
-    # ✨ (파란색: 학생 성취율) 문구 삭제됨 ✨
-    
     for i in range(len(x_pos)):
         val = int(s_pct.iloc[i])
         pos = x_pos[i]
         
         # 막대 위쪽에 일정한 비율로 텍스트 예쁘게 배치
         y_p = val + (ax2_limit * 0.04)
-        # ✨ 텍스트 색상 청록색(COLOR_UNIT)으로 통일 ✨
         t = ax2.text(pos, y_p, f"{val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_UNIT)
         t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
 
@@ -198,8 +196,8 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 
     diag_combined = ""
     if c_best: diag_combined += f"특히 {', '.join([f'[{c}]' for c in c_best])} 영역에서 높은 이해도와 응용력을 보이며 탁월한 강점을 나타내고 있습니다. 이 역영에서는 지속적으로 성취도를 유지할 수 있도록 연습이 필요합니다. "
-    if c_good: diag_combined += f" {', '.join([f'[{c}]' for c in c_good])} 영역 역시 양호한 정답률을 유지하며 탄탄한 기본기를 증명했지만 실수를 줄이는 연습과 심화적인 부분의 학습이 필요합니다. "
-    if c_weak: diag_combined += f"다만, {', '.join([f'[{c}]' for c in c_weak])} 영역은 복합 개념 적용에 있어 다소 아쉬움이 남습니다. 영역에 해당하는 개념, 응용 문제들을 해결하면서 정밀한 보완이 필요합니다. "
+    if c_good: diag_combined += f"{', '.join([f'[{c}]' for c in c_good])} 영역 역시 양호한 정답률을 유지하며 탄탄한 기본기를 증명했지만 실수를 줄이는 연습과 심화적인 부분의 학습이 필요합니다. "
+    if c_weak: diag_combined += f"{', '.join([f'[{c}]' for c in c_weak])} 영역은 복합 개념 적용에 있어 다소 아쉬움이 남습니다. 영역에 해당하는 개념, 응용 문제들을 해결하면서 정밀한 보완이 필요합니다. "
     if c_warn: diag_combined += f"무엇보다 {', '.join([f'[{c}]' for c in c_warn])} 영역은 기본적인 개념부터 다시 집중적으로 연습하여 성취도를 끌어올릴 수 있는 재학습이 필요해 보입니다. "
 
     # 3. 단원별 분석
@@ -216,7 +214,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         diag_combined += "전반적인 단원 성취도가 고르게 나타나고 있습니다."
 
     # 4. 향후 솔루션
-    weak_list = u_res[u_res < 60].index.tolist()
+    weak_list = u_res[u_res < 40].index.tolist()
     if weak_list:
         sol_text = f"{student_name} 학생은 {', '.join([f'<{u}>' for u in weak_list])} 단원에 대한 철저한 오답 분석이 최우선 과제입니다. JEET만의 맞춤 솔루션인 JEET CARE+와 JDM(JEET DAILY MAKE UP) 시스템을 적극 활용하여 발견된 취약점을 빈틈없이 메워 나가며 다음 단계로의 도약을 준비하겠습니다." 
     else:
@@ -247,7 +245,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         fig.text([0.22, 0.50, 0.78][i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
 
 
-# --- 4. 개별/일괄 데이터 처리 함수 (✨원래 로직으로 100% 복구✨) ---
+# --- 4. 개별/일괄 데이터 처리 함수 ---
 def prepare_report_data(selected_test):
     _, _, _, df_info, df_results = load_data()
     df_info = df_info[df_info['시험명'] == selected_test]
@@ -307,7 +305,6 @@ def generate_jeet_expert_report(target_name, selected_test):
         return True, pdf_buffer, "리포트 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
-# --- 반별 일괄 리포트 생성 함수 (✨원래 로직으로 100% 복구✨) ---
 def generate_batch_report(target_class, selected_test, selected_students=None):
     try:
         df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_int = prepare_report_data(selected_test)
@@ -350,7 +347,7 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 
-# --- 5. Streamlit 웹 UI 구성 (✨원래 로직으로 100% 복구✨) ---
+# --- 5. Streamlit 웹 UI 구성 ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 col1, col2 = st.columns([8, 2])
 with col1: st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
@@ -418,7 +415,7 @@ with tab2:
                 st.download_button("📥 PDF 다운로드", buf.getvalue(), f"{target_student}_리포트.pdf", "application/pdf")
             else: st.error(msg)
 
-# --- 탭 3: 학생 선택 기능이 포함된 일괄 리포트 출력 (✨원래 로직으로 100% 복구✨) ---
+# --- 탭 3: 학생 선택 기능이 포함된 일괄 리포트 출력 ---
 with tab3:
     st.subheader(f"[{selected_test}] 반별 전체 심층 분석 일괄 출력")
     
