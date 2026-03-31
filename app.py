@@ -28,7 +28,7 @@ except Exception as e:
     plt.rcParams['font.family'] = 'sans-serif'
 
 plt.rcParams['axes.unicode_minus'] = False
-  
+
 COLOR_NAVY = '#1A237E'; COLOR_RED = '#D32F2F'; COLOR_STUDENT = '#0056B3'
 COLOR_AVG = '#757575'; COLOR_GRID = '#E0E0E0'; COLOR_BG = '#F8F9FA'
 
@@ -159,35 +159,53 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     u_res = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
     avg_val, total_avg_val = int(cat_ratio.mean()), int(avg_cat_ratio.mean())
     
-    eval_tier = "심화 개념까지 완벽히 소화하는 탁월한 성취도" if avg_val >= 90 else "성실한 학습 태도가 돋보이는 우수한 성취도" if avg_val >= 75 else "개념을 정립하며 꾸준히 도약 중인 성취도" if avg_val >= 60 else "기초를 다지며 가능성을 키워가는 단계의 성취도"
+    # 1. 총평
+    if avg_val >= 90:
+        eval_tier = "심화 개념까지 완벽히 소화하며 탁월한 수학적 직관력을 보여주는 최상위 수준의 성취도"
+    elif avg_val >= 75:
+        eval_tier = "안정적인 기본기를 바탕으로 성실한 학습 태도가 돋보이는 우수한 성취도"
+    elif avg_val >= 60:
+        eval_tier = "핵심 개념을 정립해 나가며 꾸준한 성장이 기대되는 도약 단계의 성취도"
+    else:
+        eval_tier = "수학적 기초 체력을 다지며 자신감을 키워가야 하는 잠재력 발현 단계의 성취도"
+        
     diag_total = f"{student_name} 학생은 전체 평균({total_avg_val}%) 대비 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."
 
+    # 2. 영역별 분석
     c_best = cat_ratio[cat_ratio >= 80].index.str.replace('\n', '').tolist()
     c_good = cat_ratio[(cat_ratio >= 60) & (cat_ratio < 80)].index.str.replace('\n', '').tolist()
     c_weak = cat_ratio[(cat_ratio >= 40) & (cat_ratio < 60)].index.str.replace('\n', '').tolist()
     c_warn = cat_ratio[cat_ratio < 40].index.str.replace('\n', '').tolist()
 
     diag_combined = ""
-    if c_best: diag_combined += f"{', '.join([f'[{c}]' for c in c_best])} 영역에서 최우수 성취도를 보이며 견고한 실력을 입증했습니다. "
-    if c_good: diag_combined += f"{', '.join([f'[{c}]' for c in c_good])} 영역은 양호한 정답률을 보이며 평균 이상의 성과 거두고 있습니다. "
-    if c_weak: diag_combined += f"{', '.join([f'[{c}]' for c in c_weak])} 영역은 개념 적용 단계의 정밀한 보완이 필요합니다. "
-    if c_warn: diag_combined += f"{', '.join([f'[{c}]' for c in c_warn])} 영역은 기초 단계의 집중적인 재학습이 필요합니다. "
+    if c_best: diag_combined += f"특히 {', '.join([f'[{c}]' for c in c_best])} 영역에서 높은 이해도와 응용력을 보이며 탁월한 강점을 나타내고 있습니다. "
+    if c_good: diag_combined += f"더불어 {', '.join([f'[{c}]' for c in c_good])} 영역 역시 양호한 정답률을 유지하며 탄탄한 기본기를 증명했습니다. "
+    if c_weak: diag_combined += f"다만, {', '.join([f'[{c}]' for c in c_weak])} 영역은 복합 개념 적용에 있어 다소 아쉬움이 남아 정밀한 보완이 요구됩니다. "
+    if c_warn: diag_combined += f"무엇보다 {', '.join([f'[{c}]' for c in c_warn])} 영역은 근본적인 원리부터 다시 점검하는 집중적인 재학습이 필요해 보입니다. "
 
+    # 3. 단원별 분석
     g_best = u_res[u_res >= 80].index.tolist()
     g_good = u_res[(u_res >= 60) & (u_res < 80)].index.tolist()
     g_weak = u_res[(u_res >= 40) & (u_res < 60)].index.tolist()
     g_warn = u_res[u_res < 40].index.tolist()
 
-    if g_best: diag_combined += f"단원별로는 {', '.join([f'<{u}>' for u in g_best])} 단원은 굉장히 안정적이고, 완성도가 매우 높습니다. "
-    if g_good: diag_combined += f"{', '.join([f'<{u}>' for u in g_good])} 단원은 안정적이나 응용력 보강이 필요합니다. "
-    if g_weak: diag_combined += f"{', '.join([f'<{u}>' for u in g_weak])} 단원은 취약 유형에 대한 집중 분석이 요구됩니다. "
-    if g_warn: diag_combined += f"{', '.join([f'<{u}>' for u in g_warn])} 단원은 기초부터 다시 다지는 클리닉이 선행되어야 합니다."
+    if g_best: diag_combined += f"세부 단원별로는 {', '.join([f'<{u}>' for u in g_best])} 단원의 완성도가 매우 훌륭합니다. "
+    if g_good: diag_combined += f"{', '.join([f'<{u}>' for u in g_good])} 단원은 안정적인 궤도에 올랐으나 약간의 응용력 보강이 남았습니다. "
+    if g_weak: diag_combined += f"{', '.join([f'<{u}>' for u in g_weak])} 단원은 잦은 실수가 발생하는 취약 유형에 대한 집중 분석이 필요합니다. "
+    if g_warn: diag_combined += f"{', '.join([f'<{u}>' for u in g_warn])} 단원은 기초부터 다시 다지는 맞춤형 클리닉이 선행되어야 합니다."
+    if not (g_best or g_good or g_weak or g_warn):
+        diag_combined += "전반적인 단원 성취도가 고르게 나타나고 있습니다."
 
+    # 4. 향후 솔루션
     weak_list = u_res[u_res < 60].index.tolist()
-    sol_text = f" {', '.join([f'<{u}>' for u in weak_list])} 단원에 대한 오답 분석과 JEET만의 맞춤 솔루션인 JEET CARE+와 JDM(JEET DAILY MAKE UP)을 통해 부족한 단원을 메워 나가겠습니다." if weak_list else "모든 단원에서 고른 성취를 보이고 있으므로 상위권 도약을 위한 고난도 문항 도전과 실전 감각 유지가 핵심입니다."
+    if weak_list:
+        sol_text = f"{student_name} 학생은 {', '.join([f'<{u}>' for u in weak_list])} 단원에 대한 철저한 오답 분석이 최우선 과제입니다. JEET만의 맞춤 솔루션인 JEET CARE+와 JDM(JEET DAILY MAKE UP) 시스템을 적극 활용하여 발견된 취약점을 빈틈없이 메워 나가며 다음 단계로의 도약을 준비하겠습니다." 
+    else:
+        sol_text = f"모든 단원에서 고르고 우수한 성취를 보이고 있는 만큼, 현재의 좋은 흐름을 유지하는 것이 중요합니다. 상위권 도약을 위한 고난도 심화 문항 도전과 실전 감각 유지를 목표로 JEET의 커리큘럼을 따라 한 단계 더 성장할 수 있도록 지도하겠습니다."
 
     sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", diag_combined), ("[JEET 맞춤 솔루션]", sol_text)]
 
+    # 텍스트 레이아웃 출력부 (기존 로직 유지)
     curr_y, base_spacing = 0.41, 0.08
     for subtitle, content in sections:
         stxt = fig.text(0.11, curr_y, subtitle, fontsize=9.5, fontweight='bold', color='#222')
@@ -323,7 +341,7 @@ test_list = df_info_all['시험명'].dropna().unique().tolist()
 selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
 df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 
-tab1, tab2, tab3 = st.tabs(["📝 신규 성적 입력", "📑 개별 리포트 출력", "🗂️ 일괄 리포트 출력"])
+tab1, tab2, tab3 = st.tabs(["📝 신규 성적 입력", "📑 개별 리포트 출력", "🗂 일괄 리포트 출력"])
 
 with tab1:
     st.subheader(f"[{selected_test}] 신규 학생 성적 입력")
@@ -346,7 +364,7 @@ with tab1:
             
             if st.form_submit_button("구글 시트에 성적 저장하기", type="primary"):
                 clean_name = input_name.strip()
-                if not clean_name: st.error("⚠️ 이름을 입력해주세요.")
+                if not clean_name: st.error("⚠ 이름을 입력해주세요.")
                 else:
                     try:
                         header_row = ws_results.row_values(1)
@@ -379,15 +397,12 @@ with tab3:
     st.subheader(f"[{selected_test}] 반별 전체 심층 분석 일괄 출력")
     
     if '반' in df_results_all.columns:
-        # 시트 전체에서 존재하는 모든 반 이름을 긁어와서 선택 상자(Dropdown)로 만듭니다.
         all_classes = df_results_all['반'].astype(str).str.strip().unique().tolist()
         class_list = sorted([c for c in all_classes if c and c != '0' and c != 'nan'])
         
         if class_list:
-            # ✨ 텍스트 입력 대신 드롭다운으로 선택
             target_class = st.selectbox("📌 출력할 반을 선택하세요:", class_list)
             
-            # 선택된 시험(selected_test)과 선택된 반(target_class)에 모두 속하는 학생 명단 추출
             students_in_class = df_results_all[
                 (df_results_all['시험명'] == selected_test) & 
                 (df_results_all['반'].astype(str).str.strip() == target_class)
@@ -402,14 +417,14 @@ with tab3:
                     default=students_in_class
                 )
             else:
-                st.warning(f"⚠️ 현재 선택하신 '{selected_test}' 과정에 '{target_class}' 학생 데이터가 없습니다.")
+                st.warning(f"⚠ 현재 선택하신 '{selected_test}' 과정에 '{target_class}' 학생 데이터가 없습니다.")
                 selected_students = []
         else:
             st.info("구글 시트에 아직 입력된 '반' 데이터가 없습니다.")
             target_class = st.text_input("출력할 반 이름 직접 입력:", placeholder="예: S반")
             selected_students = None
     else:
-        st.warning("⚠️ 구글 시트 'Student_Results' 탭에 '반' 컬럼이 없어 수동으로 입력해야 합니다.")
+        st.warning("⚠ 구글 시트 'Student_Results' 탭에 '반' 컬럼이 없어 수동으로 입력해야 합니다.")
         target_class = st.text_input("출력할 반 이름 직접 입력:", placeholder="예: S반")
         selected_students = None
 
