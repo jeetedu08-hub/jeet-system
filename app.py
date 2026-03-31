@@ -10,7 +10,7 @@ import traceback
 import streamlit as st
 import io
 import json
-# ✨ Supabase 연동 라이브러리
+# ✨ Supabase 연동 라이브러리 (pip install supabase 필요)
 from supabase import create_client, Client
 
 # --- 1. 환경 및 폰트 설정 (원장님 코드 100% 동일) ---
@@ -34,6 +34,7 @@ COLOR_AVG = '#757575'; COLOR_GRID = '#E0E0E0'; COLOR_BG = '#F8F9FA'
 # --- 2. ✨ Supabase 연동 및 캐시 설정 (구글 시트 로직 대체) ---
 @st.cache_resource
 def init_supabase() -> Client:
+    # 스트림릿 secrets에 저장된 정보 사용
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
     return create_client(url, key)
@@ -54,6 +55,7 @@ def fetch_all_dataframes():
     return df_info, df_results
 
 def load_data():
+    # 원장님의 기존 함수 호출 구조 유지
     df_info, df_results = fetch_all_dataframes()
     return df_info, df_results
 
@@ -208,8 +210,9 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         fig.text([0.22, 0.50, 0.78][i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
 
 
-# --- 4. 개별/일괄 데이터 처리 함수 (로직 100% 보존) ---
+# --- 4. 개별/일괄 데이터 처리 함수 (구조 및 로직 100% 보존) ---
 def prepare_report_data(selected_test):
+    # load_data() 호출부 변경
     df_info, df_results = load_data()
     df_info = df_info[df_info['시험명'] == selected_test]
     df_results = df_results[df_results['시험명'] == selected_test]
@@ -247,14 +250,18 @@ def generate_jeet_expert_report(target_name, selected_test):
             for _, s_row in df_results.iterrows():
                 student_name = str(s_row.get('이름', '')).strip()
                 if not student_name or student_name == '0' or student_name != str(target_name).strip(): continue
+                    
                 student_found = True
                 student_grade = s_row.get('학년', '')
+                
                 analysis = df_info.copy()
                 analysis['영역'] = analysis['영역'].str.replace('문제해결력', '문제\n해결력')
                 analysis['정답여부'] = [safe_to_int(s_row.get(str(q), 0)) for q in analysis['문항번호']]
                 analysis['득점'] = analysis['정답여부'] * analysis['배점']
+                
                 cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
-                unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'}).reindex([u for u in unit_order if u in unit_data.index])
+                unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
+                unit_data = unit_data.reindex([u for u in unit_order if u in unit_data.index])
 
                 fig = plt.figure(figsize=(8.27, 11.69))
                 draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
@@ -272,7 +279,8 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
             cleaned_selected = [str(s).strip() for s in selected_students]
             class_students = class_students[class_students['이름'].astype(str).str.strip().isin(cleaned_selected)]
         
-        if class_students.empty: return False, None, "데이터 없음"
+        if class_students.empty:
+            return False, None, f"선택된 학생 데이터가 없습니다."
             
         pdf_buffer = io.BytesIO()
         with PdfPages(pdf_buffer) as pdf:
@@ -286,15 +294,15 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                 analysis['득점'] = analysis['정답여부'] * analysis['배점']
                 cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
                 unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'}).reindex([u for u in unit_order if u in unit_data.index])
-
                 fig = plt.figure(figsize=(8.27, 11.69))
                 draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
                 pdf.savefig(fig); plt.close(fig)
-        return True, pdf_buffer, "완료"
-    except Exception as e: return False, None, f"오류: {traceback.format_exc()}"
+            
+        return True, pdf_buffer, f"'{target_class}' 반 일괄 생성 완료!"
+    except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 
-# --- 5. Streamlit 웹 UI (원장님 코드 100% 보존 + 탭 3 최신 로직) ---
+# --- 5. Streamlit 웹 UI (원장님 코드 100% 보존) ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 col1, col2 = st.columns([8, 2])
 with col1: st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
@@ -302,6 +310,7 @@ with col2:
     if os.path.exists("logo.png"): st.image("logo.png", width=150)
 
 try:
+    # Supabase 데이터 로드
     df_info_all, df_results_all = load_data()
 except Exception as e:
     st.error(f"데이터베이스 로드 실패: {e}"); st.stop()
@@ -332,12 +341,22 @@ with tab1:
                         choice = st.radio(f"**{q_num}번**", options=["O", "X"], horizontal=True, key=f"q_{q_num}")
                         answers[str(q_num)] = 1 if choice == "O" else 0
             
+            # ✨ Supabase 저장 로직
             if st.form_submit_button("데이터베이스에 성적 저장하기", type="primary"):
                 clean_name = input_name.strip()
                 if not clean_name: st.error("⚠ 이름을 입력해주세요.")
                 else:
                     try:
-                        submit_data = {"시험명": selected_test, "이름": clean_name, "반": input_class, "학교": input_school, "학년": input_grade, **answers}
+                        # 저장할 데이터 딕셔너리 생성
+                        submit_data = {
+                            "시험명": selected_test,
+                            "이름": clean_name,
+                            "반": input_class,
+                            "학교": input_school,
+                            "학년": input_grade,
+                            **answers
+                        }
+                        # Supabase 테이블에 한 줄 추가
                         supabase.table('Student_Results').insert(submit_data).execute()
                         st.success("데이터베이스에 성공적으로 저장되었습니다!"); st.cache_data.clear()
                     except Exception as e: st.error(f"저장 중 오류: {e}")
@@ -360,17 +379,13 @@ with tab3:
         class_list = sorted([c for c in all_classes if c and c != '0' and c != 'nan'])
         if class_list:
             target_class = st.selectbox("📌 출력할 반을 선택하세요:", class_list)
-            students_in_class = df_results_all[(df_results_all['시험명'] == selected_test) & (df_results_all['반'].astype(str).str.strip() == target_class)]['이름'].astype(str).str.strip().tolist()
-            students_in_class = sorted([s for s in students_in_class if s and s != '0' and s != 'nan'])
+            students_in_class = sorted(df_results_all[(df_results_all['시험명'] == selected_test) & (df_results_all['반'].astype(str).str.strip() == target_class)]['이름'].astype(str).str.strip().tolist())
             if students_in_class:
-                selected_students = st.multiselect("👇 출력할 학생을 선택하세요 (제외할 학생의 'X'를 누르세요):", options=students_in_class, default=students_in_class)
+                selected_students = st.multiselect("👇 출력할 학생을 선택하세요:", options=students_in_class, default=students_in_class)
                 if st.button("반 전체/선택 일괄 PDF 생성", type="primary"):
-                    with st.spinner(f"리포트를 하나로 모으는 중입니다. 잠시만 기다려주세요..."):
+                    with st.spinner("리포트 생성 중..."):
                         success, buf, msg = generate_batch_report(target_class, selected_test, selected_students)
                         if success:
                             st.success(msg)
-                            st.download_button("📥 일괄 PDF 다운로드", buf.getvalue(), f"{target_class}_선택_리포트.pdf", "application/pdf")
+                            st.download_button("📥 일괄 PDF 다운로드", buf.getvalue(), f"{target_class}_일괄.pdf", "application/pdf")
                         else: st.error(msg)
-            else: st.warning(f"⚠ 해당 과정에 '{target_class}' 학생 데이터가 없습니다.")
-        else: st.info("데이터베이스에 아직 입력된 '반' 데이터가 없습니다.")
-    else: st.warning("⚠ 데이터베이스에 '반' 컬럼이 없습니다.")
