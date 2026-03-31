@@ -1,6 +1,5 @@
-streamlit
 pandas
 matplotlib
 numpy
-gspread
-oauth2client
+streamlit
+supabase
