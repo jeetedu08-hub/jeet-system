@@ -196,7 +196,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     c_warn = cat_ratio[cat_ratio < 20].index.str.replace('\n', '').tolist()
 
     diag_combined = ""
-    if c_best: diag_combined += f"특히 {', '.join([f'[{c}]' for c in c_best])} 영역에서 높은 이해도와 응용력을 보이며 탁월한 강점을 나타내고 있습니다. 이 역영에서는 지속적으로 성취도를 유지할 수 있도록 연습이 필요합니다. "
+    if c_best: diag_combined += f"특히 {', '.join([f'[{c}]' for c in c_best])} 영역에서 높은 이해도와 응용력을 보이며 탁월한 강점을 나타내고 있습니다. 해당 역영에서는 지속적으로 성취도를 유지할 수 있도록 연습이 필요합니다. "
     if c_good: diag_combined += f"{', '.join([f'[{c}]' for c in c_good])} 영역 역시 양호한 정답률을 유지하며 탄탄한 기본기를 증명했지만 실수를 줄이는 연습과 심화적인 부분의 학습이 필요합니다. "
     if c_weak: diag_combined += f"{', '.join([f'[{c}]' for c in c_weak])} 영역은 복합 개념 적용에 있어 다소 아쉬움이 남습니다. 해당 영역에 해당하는 개념, 응용 문제들을 해결하면서 정밀한 보완이 필요합니다. "
     if c_warn: diag_combined += f"무엇보다 {', '.join([f'[{c}]' for c in c_warn])} 영역은 기본적인 개념부터 다시 집중적으로 연습하여 성취도를 끌어올릴 수 있는 재학습이 필요해 보입니다. "
