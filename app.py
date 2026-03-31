@@ -205,21 +205,22 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 
     sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", diag_combined), ("[JEET 맞춤 솔루션]", sol_text)]
 
-    # ✨ 텍스트 레이아웃 출력부 동적 튜닝 ✨ (제목과 내용 사이 한 줄 띄어쓰기 추가)
+    # ✨ 텍스트 레이아웃 출력부 동적 튜닝 ✨ (내용과 다음 제목 사이에 여백 추가)
     curr_y = 0.415 
     for subtitle, content in sections:
-        # 제목 출력
+        # 1. 소제목 출력
         stxt = fig.text(0.11, curr_y, subtitle, fontsize=9.5, fontweight='bold', color='#222')
         stxt.set_path_effects([path_effects.withStroke(linewidth=0.5, foreground='#222')])
         
         wrapped_content = textwrap.fill(content, width=65)
         
-        # 본문 출력 (curr_y - 0.025 로 수정하여 소제목과 내용 사이에 한 줄 공간 확보)
-        ctxt = fig.text(0.11, curr_y - 0.025, wrapped_content, fontsize=8.2, linespacing=1.6, va='top', color='#333')
+        # 2. 본문 출력 (제목 바로 아래에 예쁘게 붙여서 출력되도록 0.015 간격 복구)
+        ctxt = fig.text(0.11, curr_y - 0.015, wrapped_content, fontsize=8.2, linespacing=1.6, va='top', color='#333')
         
-        # 다음 섹션 시작 위치 계산 (위에서 내용이 더 아래로 내려간 만큼 0.032 -> 0.042 로 여유를 더 줌)
+        # 3. 다음 섹션 시작 위치 계산 (여기서 한 줄 띄우기!)
+        # 본문이 차지하는 공간(num_lines * 0.013) + 다음 제목까지의 여백(0.045)을 더해 크게 띄워줍니다.
         num_lines = len(wrapped_content.split('\n'))
-        curr_y -= (0.042 + (num_lines * 0.013))
+        curr_y -= (0.045 + (num_lines * 0.013))
 
     line_footer = plt.Line2D([0.05, 0.95], [0.10, 0.10], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure); fig.lines.append(line_footer)
     campuses = [("수지 캠퍼스: 276-8003", "풍덕천로 129번길 16-1"), ("죽전 캠퍼스: 263-8003", "기흥구 죽현로 29"), ("광교 캠퍼스: 257-8003", "영통구 혜명로 10")]
