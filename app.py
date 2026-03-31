@@ -41,6 +41,7 @@ def get_supabase_client() -> Client:
     key = st.secrets["SUPABASE_KEY"]
     return create_client(url, key)
 
+# ★ 수정된 부분: 이 함수가 누락되어 에러가 났었습니다. ★
 @st.cache_data(ttl=120)
 def fetch_all_dataframes():
     supabase = get_supabase_client()
@@ -51,11 +52,9 @@ def fetch_all_dataframes():
     results_res = supabase.table("Student_Results").select("*").execute()
     df_results = pd.DataFrame(results_res.data)
     
-    # --- [이 부분을 수정합니다] ---
     if not df_results.empty:
-        # 1. 이름 컬럼을 문자열로 변환하고 양옆 공백 제거
+        # 이름이 없거나 '0.0', '0'인 유령 데이터 필터링
         df_results['이름'] = df_results['이름'].astype(str).str.strip()
-        # 2. 이름이 없거나 '0.0', '0', 'nan'인 유령 데이터들만 골라서 삭제
         df_results = df_results[
             (df_results['이름'] != '') & 
             (df_results['이름'] != '0') & 
@@ -63,12 +62,15 @@ def fetch_all_dataframes():
             (df_results['이름'] != 'nan') &
             (df_results['이름'].notna())
         ]
-        # 3. 반 정보에 0.0이나 0이 들어가 있으면 빈 칸으로 청소
+        # 반 정보 청소
         df_results['반'] = df_results['반'].astype(str).str.replace('0.0', '').replace('0', '').replace('nan', '').str.strip()
-    # -----------------------------
     
     df_results = df_results.replace('', 0).fillna(0)
     return df_info, df_results
+
+def load_data():
+    df_info, df_results = fetch_all_dataframes()
+    return None, None, None, df_info, df_results
 
 
 # --- 3. 공통 그래프 그리기 함수 (기존 로직 100% 동일) ---
@@ -149,7 +151,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         t = ax2.text(pos, y_p, f"{val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_STUDENT)
         t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
 
-    # --- 하단 심층 분석 박스 (멘트 로직 100% 동일) ---
+    # --- 하단 심층 분석 박스 ---
     rect_diag = plt.Rectangle((0.08, 0.12), 0.84, 0.35, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
     fig.patches.append(rect_diag)
     
@@ -356,7 +358,6 @@ with tab3:
     st.subheader("반별 일괄 출력")
     if '반' in df_results_all.columns:
         # --- [이 부분을 수정합니다] ---
-        # 선택한 시험 과정에 실제로 존재하는 '반'만 가져오고, 빈 칸('')은 목록에서 뺍니다.
         current_test_results = df_results_all[df_results_all['시험명'] == selected_test]
         all_classes = current_test_results['반'].astype(str).str.strip().unique().tolist()
         class_list = sorted([c for c in all_classes if c and c != ''])
