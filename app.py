@@ -350,8 +350,18 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
 
 # --- 5. Streamlit 웹 UI 구성 ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
+
+# --- [추가 위치] 사이드바 최상단에 새로고침 버튼 배치 ---
+if st.sidebar.button("🔄 구글 시트 데이터 새로고침", use_container_width=True):
+    st.cache_data.clear()
+    st.success("데이터를 새로 불러왔습니다!")
+    st.rerun()
+
+st.sidebar.markdown("---") # 구분선
+
 col1, col2 = st.columns([8, 2])
 with col1: st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
+# ... (이후 기존 코드 동일)
 with col2: 
     if os.path.exists("logo.png"): st.image("logo.png", width=150)
 
