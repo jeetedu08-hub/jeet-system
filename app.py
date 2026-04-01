@@ -262,7 +262,7 @@ def prepare_report_data(selected_test):
         try: return int(float(val))
         except: return 0
 
-    df_scores = df_results[valid_cols].applymap(safe_to_int)
+    df_scores = df_results[valid_cols].map(safe_to_int)
     avg_per_q = df_scores.mean()
     
     total_analysis = df_info.copy()
