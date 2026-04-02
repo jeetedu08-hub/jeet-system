@@ -4,3 +4,4 @@ google-auth
 pandas
 matplotlib
 numpy
+supabase
