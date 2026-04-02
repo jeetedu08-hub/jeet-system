@@ -8,10 +8,8 @@ import matplotlib.font_manager as fm
 import matplotlib.patheffects as path_effects
 import traceback
 import streamlit as st
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import io
-import json
+from supabase import create_client, Client
 
 # --- 1. 환경 및 폰트 설정 (에러 방지 안전장치 추가) ---
 font_path = "malgun.ttf"
@@ -24,7 +22,6 @@ try:
         plt.rcParams['font.family'] = 'Malgun Gothic'
 except Exception as e:
     print(f"폰트 로딩 실패 (기본 폰트로 대체됨): {e}")
-    # 폰트 로드 실패 시 시스템 기본 산세리프 폰트로 우회하여 앱 뻗음 방지
     plt.rcParams['font.family'] = 'sans-serif'
 
 plt.rcParams['axes.unicode_minus'] = False
@@ -37,38 +34,29 @@ COLOR_AVG = '#757575'
 COLOR_GRID = '#E0E0E0'
 COLOR_BG = '#F8F9FA'
 
-# --- 2. 구글 스프레드시트 연동 및 캐시 설정 ---
+# --- 2. Supabase 연동 및 캐시 설정 ---
 @st.cache_resource
-def get_google_sheet():
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    if "GOOGLE_JSON" in st.secrets:
-        creds_dict = json.loads(st.secrets["GOOGLE_JSON"])
-    elif "gcp_secret_string" in st.secrets:
-        creds_dict = json.loads(st.secrets["gcp_secret_string"])
-    elif "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-        creds_dict = json.loads(st.secrets["connections"]["gsheets"].get("credentials", "{}"))
-    else:
-        creds = ServiceAccountCredentials.from_json_keyfile_name("secrets.json", scope)
-        
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    doc = client.open_by_url("https://docs.google.com/spreadsheets/d/1bYv3ff5xwzd4DS3EZUC9Xj6GSpeVmijobbW0svKpqXU/edit")
-    return doc
+def init_supabase() -> Client:
+    url: str = st.secrets["SUPABASE_URL"]
+    key: str = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
 
 @st.cache_data(ttl=120)
 def fetch_all_dataframes():
-    doc = get_google_sheet()
-    df_info = pd.DataFrame(doc.worksheet('Test_Info').get_all_records())
-    df_results = pd.DataFrame(doc.worksheet('Student_Results').get_all_records())
-    df_results = df_results.replace('', 0).fillna(0)
+    supabase = init_supabase()
+    # test_info 가져오기
+    info_res = supabase.table("test_info").select("*").execute()
+    df_info = pd.DataFrame(info_res.data)
+    
+    # student_results 가져오기
+    results_res = supabase.table("student_results").select("*").execute()
+    df_results = pd.DataFrame(results_res.data)
+    
+    if not df_results.empty:
+        df_results = df_results.fillna(0)
+        df_results.columns = df_results.columns.astype(str)
+        
     return df_info, df_results
-
-def load_data():
-    doc = get_google_sheet()
-    ws_info = doc.worksheet('Test_Info')
-    ws_results = doc.worksheet('Student_Results')
-    df_info, df_results = fetch_all_dataframes()
-    return doc, ws_info, ws_results, df_info, df_results
 
 
 # --- 3. 공통 그래프 그리기 함수 (개별/일괄 출력에서 모두 사용) ---
@@ -186,7 +174,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     else:
         eval_tier = "수학적 기초 체력을 다지며 자신감을 키워가야 하는 잠재력 발현 단계의 성취도"
         
-    # ✨ [수정] 전체 평균 부분 제거 ✨
     diag_total = f"{student_name} 학생은 성취도 {avg_val}%를 기록하며, 현재 [{eval_tier}]를 보여주고 있습니다."
 
     # 2. 영역별 분석
@@ -248,10 +235,10 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 
 # --- 4. 개별/일괄 데이터 처리 함수 ---
 def prepare_report_data(selected_test):
-    _, _, _, df_info, df_results = load_data()
+    df_info, df_results = fetch_all_dataframes()
+    
     df_info = df_info[df_info['시험명'] == selected_test]
     df_results = df_results[df_results['시험명'] == selected_test]
-    df_results.columns = df_results.columns.astype(str)
     df_info['배점'] = df_info['배점'].replace('', 3).fillna(3).astype(int)
     
     unit_order = df_info['단원'].drop_duplicates().tolist()
@@ -262,8 +249,8 @@ def prepare_report_data(selected_test):
         try: return int(float(val))
         except: return 0
 
-    df_scores = df_results[valid_cols].map(safe_to_int)
-    avg_per_q = df_scores.mean()
+    df_scores = df_results[valid_cols].map(safe_to_int) if not df_results.empty else pd.DataFrame()
+    avg_per_q = df_scores.mean() if not df_scores.empty else pd.Series()
     
     total_analysis = df_info.copy()
     total_analysis['평균득점'] = total_analysis['문항번호'].apply(lambda x: avg_per_q.get(str(x), 0))
@@ -310,10 +297,8 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
     try:
         df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_int = prepare_report_data(selected_test)
         
-        # 1차 필터링: 입력받은 반과 일치하는 학생 (양옆 공백 완전 제거 후 비교)
         class_students = df_results[df_results['반'].astype(str).str.strip() == str(target_class).strip()]
         
-        # 2차 필터링: 선택된 학생 명단이 있다면 해당 학생들만 남김 (이름의 양옆 공백도 완전 제거 후 비교)
         if selected_students is not None:
             cleaned_selected = [str(s).strip() for s in selected_students]
             class_students = class_students[class_students['이름'].astype(str).str.strip().isin(cleaned_selected)]
@@ -325,7 +310,6 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
         
         with PdfPages(pdf_buffer) as pdf:
             for _, s_row in class_students.iterrows():
-                # 여기서도 이름 공백 제거
                 student_name = str(s_row.get('이름', '')).strip()
                 if not student_name or student_name == '0': continue
                     
@@ -348,30 +332,36 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 
-# --- 5. Streamlit 웹 UI 구성 ---
+# --- 5. Stream 추이 UI 구성 ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 
-# --- [추가 위치] 사이드바 최상단에 새로고침 버튼 배치 ---
-if st.sidebar.button("🔄 구글 시트 데이터 새로고침", use_container_width=True):
+if st.sidebar.button("🔄 데이터베이스 새로고침", use_container_width=True):
     st.cache_data.clear()
     st.success("데이터를 새로 불러왔습니다!")
     st.rerun()
 
-st.sidebar.markdown("---") # 구분선
+st.sidebar.markdown("---") 
 
 col1, col2 = st.columns([8, 2])
 with col1: st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
-# ... (이후 기존 코드 동일)
 with col2: 
     if os.path.exists("logo.png"): st.image("logo.png", width=150)
 
 try:
-    doc, ws_info, ws_results, df_info_all, df_results_all = load_data()
+    df_info_all, df_results_all = fetch_all_dataframes()
 except Exception as e:
-    st.error(f"구글 시트 로드 실패: {e}"); st.stop()
+    st.error(f"데이터베이스 로드 실패: {e}"); st.stop()
 
 st.sidebar.header("📚 시험 과정 선택")
-test_list = df_info_all['시험명'].dropna().unique().tolist()
+if not df_info_all.empty and '시험명' in df_info_all.columns:
+    test_list = df_info_all['시험명'].dropna().unique().tolist()
+else:
+    test_list = []
+    
+if not test_list:
+    st.warning("데이터베이스에 시험 정보가 없습니다.")
+    st.stop()
+
 selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
 df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 
@@ -396,24 +386,29 @@ with tab1:
                         choice = st.radio(f"**{q_num}번**", options=["O", "X"], horizontal=True, key=f"q_{q_num}")
                         answers[str(q_num)] = 1 if choice == "O" else 0
             
-            if st.form_submit_button("구글 시트에 성적 저장하기", type="primary"):
+            if st.form_submit_button("DB에 성적 저장하기", type="primary"):
                 clean_name = input_name.strip()
                 if not clean_name: st.error("⚠ 이름을 입력해주세요.")
                 else:
                     try:
-                        header_row = ws_results.row_values(1)
-                        new_row = []
-                        for col_name in header_row:
-                            col_str = str(col_name)
-                            if col_str == '시험명': new_row.append(selected_test) 
-                            elif col_str == '이름': new_row.append(clean_name)
-                            elif col_str == '반': new_row.append(input_class)
-                            elif col_str == '학교': new_row.append(input_school)
-                            elif col_str == '학년': new_row.append(input_grade)
-                            elif col_str in answers: new_row.append(answers[col_str])
-                            else: new_row.append("")
-                        ws_results.append_row(new_row); st.success("성적이 저장되었습니다!"); st.cache_data.clear()
-                    except Exception as e: st.error(f"저장 중 오류: {e}")
+                        # Supabase 테이블에 Insert할 딕셔너리 구성
+                        new_record = {
+                            "시험명": selected_test,
+                            "이름": clean_name,
+                            "반": input_class,
+                            "학교": input_school,
+                            "학년": input_grade
+                        }
+                        # 각 문항의 정답 여부를 레코드에 추가
+                        for q_num, ans in answers.items():
+                            new_record[str(q_num)] = ans
+
+                        supabase = init_supabase()
+                        supabase.table("student_results").insert(new_record).execute()
+                        
+                        st.success("성적이 DB에 안전하게 저장되었습니다!")
+                        st.cache_data.clear() 
+                    except Exception as e: st.error(f"저장 중 오류 발생: {e}")
 
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
@@ -426,7 +421,6 @@ with tab2:
                 st.download_button("📥 PDF 다운로드", buf.getvalue(), f"{target_student}_리포트.pdf", "application/pdf")
             else: st.error(msg)
 
-# --- 탭 3: 학생 선택 기능이 포함된 일괄 리포트 출력 ---
 with tab3:
     st.subheader(f"[{selected_test}] 반별 전체 심층 분석 일괄 출력")
     
@@ -454,11 +448,11 @@ with tab3:
                 st.warning(f"⚠ 현재 선택하신 '{selected_test}' 과정에 '{target_class}' 학생 데이터가 없습니다.")
                 selected_students = []
         else:
-            st.info("구글 시트에 아직 입력된 '반' 데이터가 없습니다.")
+            st.info("DB에 아직 입력된 '반' 데이터가 없습니다.")
             target_class = st.text_input("출력할 반 이름 직접 입력:", placeholder="예: S반")
             selected_students = None
     else:
-        st.warning("⚠ 구글 시트 'Student_Results' 탭에 '반' 컬럼이 없어 수동으로 입력해야 합니다.")
+        st.warning("⚠ DB에 '반' 컬럼이 없어 수동으로 입력해야 합니다.")
         target_class = st.text_input("출력할 반 이름 직접 입력:", placeholder="예: S반")
         selected_students = None
 
