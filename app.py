@@ -208,7 +208,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     else:
         sol_text = f"모든 단원에서 고르고 우수한 성취를 보이고 있는 만큼, 현재의 좋은 흐름을 유지하는 것이 중요합니다. 상위권 도약을 위한 고난도 심화 문항 도전과 실전 감각 유지를 목표로 JEET의 커리큘럼을 따라 한 단계 더 성장할 수 있도록 지도하겠습니다. "
 
-sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", diag_combined), ("[JEET 맞춤 솔루션]", sol_text)]
+    sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", diag_combined), ("[JEET 맞춤 솔루션]", sol_text)]
 
     # ✨ 텍스트 레이아웃 출력부 동적 튜닝 ✨ 
     # 1. 전체 글자 수 계산
@@ -236,6 +236,22 @@ sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", di
         y_offset = 0.015
         y_gap = 0.045
         line_height = 0.013
+
+    curr_y = 0.415 
+    for subtitle, content in sections:
+        # 1. 소제목 출력 (동적 폰트 적용)
+        stxt = fig.text(0.11, curr_y, subtitle, fontsize=sub_fs, fontweight='bold', color='#222')
+        stxt.set_path_effects([path_effects.withStroke(linewidth=0.5, foreground='#222')])
+        
+        # 본문 자동 줄바꿈 (동적 너비 적용)
+        wrapped_content = textwrap.fill(content, width=wrap_width)
+        
+        # 2. 본문 출력 (동적 폰트 적용)
+        ctxt = fig.text(0.11, curr_y - y_offset, wrapped_content, fontsize=main_fs, linespacing=1.6, va='top', color='#333')
+        
+        # 3. 다음 섹션 시작 위치 계산 (동적 높이 적용)
+        num_lines = len(wrapped_content.split('\n'))
+        curr_y -= (y_gap + (num_lines * line_height))
 
     curr_y = 0.415 
     for subtitle, content in sections:
