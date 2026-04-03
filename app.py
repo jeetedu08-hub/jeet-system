@@ -211,47 +211,49 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", diag_combined), ("[JEET 맞춤 솔루션]", sol_text)]
 
     # ✨ 텍스트 레이아웃 출력부 동적 튜닝 ✨ 
-    # 1. 전체 글자 수 계산
     total_chars = sum(len(content) for _, content in sections)
 
-    # 2. 글자 수에 따른 동적 레이아웃 변수 할당 (글이 길어지면 폰트를 줄이고 한 줄에 들어가는 글자 수를 늘림)
+    # 2. 글자 수에 따른 동적 레이아웃 변수 할당
+    # linespacing=1.6 이 적용된 실제 텍스트 높이를 반영하여 line_height를 대폭 상향
     if total_chars > 800:
-        wrap_width = 82        # 한 줄당 글자 수
-        main_fs = 6.8          # 본문 폰트 크기
-        sub_fs = 8.5           # 소제목 폰트 크기
+        wrap_width = 82        
+        main_fs = 6.8          
+        sub_fs = 8.5           
         y_offset = 0.012       # 소제목과 본문 사이 간격
-        y_gap = 0.035          # 섹션 간 기본 간격
-        line_height = 0.010    # 줄당 차지하는 높이
+        section_gap = 0.025    # 섹션이 끝난 후 다음 소제목 전까지의 고정 여백
+        line_height = 0.014    # 줄당 차지하는 실제 높이
     elif total_chars > 600:
         wrap_width = 74
         main_fs = 7.5
         sub_fs = 9.0
         y_offset = 0.014
-        y_gap = 0.040
-        line_height = 0.0115
+        section_gap = 0.030
+        line_height = 0.016
     else:
         wrap_width = 65
         main_fs = 8.2
         sub_fs = 9.5
         y_offset = 0.015
-        y_gap = 0.045
-        line_height = 0.013
+        section_gap = 0.035
+        line_height = 0.018
 
     curr_y = 0.415 
     for subtitle, content in sections:
-        # 1. 소제목 출력 (동적 폰트 적용)
+        # 1. 소제목 출력
         stxt = fig.text(0.11, curr_y, subtitle, fontsize=sub_fs, fontweight='bold', color='#222')
         stxt.set_path_effects([path_effects.withStroke(linewidth=0.5, foreground='#222')])
         
-        # 본문 자동 줄바꿈 (동적 너비 적용)
+        # 본문 자동 줄바꿈
         wrapped_content = textwrap.fill(content, width=wrap_width)
         
-        # 2. 본문 출력 (동적 폰트 적용)
+        # 2. 본문 출력
         ctxt = fig.text(0.11, curr_y - y_offset, wrapped_content, fontsize=main_fs, linespacing=1.6, va='top', color='#333')
         
-        # 3. 다음 섹션 시작 위치 계산 (동적 높이 적용)
+        # 3. 다음 섹션 시작 위치 계산 (오차 수정 공식 적용)
         num_lines = len(wrapped_content.split('\n'))
-        curr_y -= (y_gap + (num_lines * line_height))
+        
+        # 다음 좌표 = 현재 Y좌표 - (본문시작점까지의 여백 + 본문전체높이 + 다음섹션전까지의 고정여백)
+        curr_y -= (y_offset + (num_lines * line_height) + section_gap)
 
     curr_y = 0.415 
     for subtitle, content in sections:
