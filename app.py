@@ -10,6 +10,7 @@ import traceback
 import streamlit as st
 import io
 from supabase import create_client, Client
+import zipfile  # 압축 파일(ZIP) 생성을 위해 추가된 라이브러리
 
 # --- 1. 환경 및 폰트 설정 (에러 방지 안전장치 추가) ---
 font_path = "malgun.ttf"
@@ -239,7 +240,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     if total_chars > 800:
         wrap_width = 82        
         main_fs = 6.8          
-        sub_fs = 8.5           
+        sub_fs = 8.5            
         y_offset = 0.012       # 소제목과 본문 사이 간격
         section_gap = 0.025    # 섹션이 끝난 후 다음 소제목 전까지의 고정 여백
         line_height = 0.014    # 줄당 차지하는 실제 높이
@@ -283,7 +284,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         fig.text([0.22, 0.50, 0.78][i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
 
 
-# --- 4. 개별/일괄 데이터 처리 함수 ---
+# --- 4. 개별/일괄 데이터 처리 함수 (PNG 및 ZIP 적용) ---
 def prepare_report_data(selected_test):
     df_info, df_results = fetch_all_dataframes()
     
@@ -316,31 +317,36 @@ def generate_jeet_expert_report(target_name, selected_test):
     try:
         df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_int = prepare_report_data(selected_test)
         student_found = False
-        pdf_buffer = io.BytesIO()
+        img_buffer = io.BytesIO()
         
-        with PdfPages(pdf_buffer) as pdf:
-            for _, s_row in df_results.iterrows():
-                student_name = str(s_row.get('이름', '')).strip()
-                if not student_name or student_name == '0' or student_name != str(target_name).strip(): continue
-                    
-                student_found = True
-                student_grade = s_row.get('학년', '')
+        for _, s_row in df_results.iterrows():
+            student_name = str(s_row.get('이름', '')).strip()
+            if not student_name or student_name == '0' or student_name != str(target_name).strip(): continue
                 
-                analysis = df_info.copy()
-                analysis['영역'] = analysis['영역'].str.replace('문제해결력', '문제\n해결력')
-                analysis['정답여부'] = [safe_to_int(s_row.get(str(q), 0)) for q in analysis['문항번호']]
-                analysis['득점'] = analysis['정답여부'] * analysis['배점']
-                
-                cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
-                unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
-                unit_data = unit_data.reindex([u for u in unit_order if u in unit_data.index])
+            student_found = True
+            student_grade = s_row.get('학년', '')
+            
+            analysis = df_info.copy()
+            analysis['영역'] = analysis['영역'].str.replace('문제해결력', '문제\n해결력')
+            analysis['정답여부'] = [safe_to_int(s_row.get(str(q), 0)) for q in analysis['문항번호']]
+            analysis['득점'] = analysis['정답여부'] * analysis['배점']
+            
+            cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
+            unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
+            unit_data = unit_data.reindex([u for u in unit_order if u in unit_data.index])
 
-                fig = plt.figure(figsize=(8.27, 11.69))
-                draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
-                pdf.savefig(fig); plt.close(fig)
+            fig = plt.figure(figsize=(8.27, 11.69))
+            draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
+            
+            # PDF 대신 PNG로 고화질 저장 (dpi 300)
+            fig.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
+            plt.close(fig)
+            break
             
         if not student_found: return False, None, "학생을 찾을 수 없습니다."
-        return True, pdf_buffer, "리포트 생성 완료!"
+        
+        img_buffer.seek(0)
+        return True, img_buffer, "리포트 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 def generate_batch_report(target_class, selected_test, selected_students=None):
@@ -356,9 +362,9 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
         if class_students.empty:
             return False, None, f"선택된 학생 데이터가 없습니다. (이름 공백/오타 확인 필요)"
             
-        pdf_buffer = io.BytesIO()
+        zip_buffer = io.BytesIO()
         
-        with PdfPages(pdf_buffer) as pdf:
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
             for _, s_row in class_students.iterrows():
                 student_name = str(s_row.get('이름', '')).strip()
                 if not student_name or student_name == '0': continue
@@ -376,9 +382,18 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
 
                 fig = plt.figure(figsize=(8.27, 11.69))
                 draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
-                pdf.savefig(fig); plt.close(fig)
+                
+                # 각각의 피규어를 임시 버퍼에 PNG로 저장
+                temp_img_buffer = io.BytesIO()
+                fig.savefig(temp_img_buffer, format='png', dpi=300, bbox_inches='tight')
+                plt.close(fig)
+                
+                # 압축 파일 내부에 '학생이름_리포트.png' 형식으로 추가
+                file_name = f"{student_name}_리포트.png"
+                zip_file.writestr(file_name, temp_img_buffer.getvalue())
             
-        return True, pdf_buffer, f"'{target_class}' 반 총 {len(class_students)}명의 리포트 일괄 생성 완료!"
+        zip_buffer.seek(0)
+        return True, zip_buffer, f"'{target_class}' 반 총 {len(class_students)}명의 리포트 일괄 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 
@@ -463,12 +478,12 @@ with tab1:
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
     target_student = st.text_input("리포트를 출력할 학생 이름:", placeholder="예: 홍길동")
-    if st.button("개별 PDF 리포트 생성", type="primary"):
+    if st.button("개별 리포트 생성 (PNG)", type="primary"):
         with st.spinner("리포트 생성 중..."):
             success, buf, msg = generate_jeet_expert_report(target_student.strip(), selected_test)
             if success:
                 st.success(msg)
-                st.download_button("📥 PDF 다운로드", buf.getvalue(), f"{target_student}_리포트.pdf", "application/pdf")
+                st.download_button("🖼️ 이미지(PNG) 다운로드", buf.getvalue(), f"{target_student}_리포트.png", "image/png")
             else: st.error(msg)
 
 with tab3:
@@ -506,16 +521,16 @@ with tab3:
         target_class = st.text_input("출력할 반 이름 직접 입력:", placeholder="예: S반")
         selected_students = None
 
-    if st.button("반 전체/선택 일괄 PDF 생성", type="primary"):
+    if st.button("반 전체/선택 일괄 생성 (ZIP)", type="primary"):
         if not target_class.strip():
             st.error("반 이름을 입력하거나 선택해주세요.")
         elif selected_students is not None and len(selected_students) == 0:
             st.error("출력할 학생을 최소 1명 이상 선택해주세요.")
         else:
-            with st.spinner(f"리포트를 하나로 모으는 중입니다. 잠시만 기다려주세요..."):
+            with st.spinner(f"리포트를 하나의 압축 파일로 모으는 중입니다. 잠시만 기다려주세요..."):
                 success, buf, msg = generate_batch_report(target_class, selected_test, selected_students)
                 if success:
                     st.success(msg)
-                    st.download_button("📥 일괄 PDF 다운로드", buf.getvalue(), f"{target_class}_선택_리포트.pdf", "application/pdf")
+                    st.download_button("📥 일괄 다운로드 (ZIP)", buf.getvalue(), f"{target_class}_리포트_모음.zip", "application/zip")
                 else: 
                     st.error(msg)
