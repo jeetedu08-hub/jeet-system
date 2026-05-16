@@ -10,7 +10,7 @@ import traceback
 import streamlit as st
 import io
 from supabase import create_client, Client
-import zipfile  # 압축 파일(ZIP) 생성을 위해 추가된 라이브러리
+import zipfile
 
 # --- 1. 환경 및 폰트 설정 (에러 방지 안전장치 추가) ---
 font_path = "malgun.ttf"
@@ -55,7 +55,8 @@ def fetch_all_dataframes():
     
     if not df_results.empty:
         df_results = df_results.fillna(0)
-        df_results.columns = df_results.columns.astype(str)
+        # 컬럼명을 문자로 바꾼 뒤, 소수점('.0')과 앞뒤 공백을 완벽히 제거
+        df_results.columns = df_results.columns.astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
         
     return df_info, df_results
 
@@ -202,7 +203,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     if not (g_best or g_good or g_weak or g_warn):
         diag_combined += "전반적인 단원별 성취도가 매우 균형 있게 나타나고 있습니다. 어느 한 쪽으로 치우치지 않는 고른 학습 균형이 큰 강점입니다."
 
-# 4. 향후 솔루션
+    # 4. 향후 솔루션
     weak_list = u_res[u_res < 40].index.tolist()
     avg_score = u_res.mean() # 전체 단원 평균 점수를 기준으로 구간 분류
 
@@ -288,34 +289,52 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 def prepare_report_data(selected_test):
     df_info, df_results = fetch_all_dataframes()
     
-    df_info = df_info[df_info['시험명'] == selected_test]
-    df_results = df_results[df_results['시험명'] == selected_test]
+    # SettingWithCopyWarning 방지
+    df_info = df_info[df_info['시험명'] == selected_test].copy()
+    df_results = df_results[df_results['시험명'] == selected_test].copy()
+    
+    # 배점 처리
     df_info['배점'] = df_info['배점'].replace('', 3).fillna(3).astype(int)
     
+    # 단원명과 영역명 앞뒤 공백 완전 제거 (오타 방지)
+    df_info['단원'] = df_info['단원'].astype(str).str.strip()
+    df_info['영역'] = df_info['영역'].astype(str).str.strip()
+    df_info['영역'] = df_info['영역'].str.replace('문제해결력', '문제\n해결력')
+    
+    # 문항번호를 float -> int -> str 순으로 깔끔하게 변환 ('1.0' -> '1')
+    df_info['문항번호'] = pd.to_numeric(df_info['문항번호'], errors='coerce').fillna(0).astype(int).astype(str)
+    
     unit_order = df_info['단원'].drop_duplicates().tolist()
-    q_cols = [str(q) for q in df_info['문항번호']]
+    q_cols = df_info['문항번호'].tolist()
     valid_cols = [col for col in df_results.columns if col in q_cols]
     
-    def safe_to_int(val):
-        try: return int(float(val))
-        except: return 0
+    # O/X 문자열 및 이상값 대응을 위한 강화된 정답 판별 함수
+    def safe_to_binary(val):
+        if isinstance(val, str):
+            v = val.strip().upper()
+            if v == 'O': return 1
+            if v == 'X': return 0
+        try:
+            # 숫자로 변환 가능할 때, 0보다 크면 무조건 정답(1) 처리
+            return 1 if float(val) > 0 else 0
+        except:
+            return 0
 
-    df_scores = df_results[valid_cols].map(safe_to_int) if not df_results.empty else pd.DataFrame()
+    df_scores = df_results[valid_cols].map(safe_to_binary) if not df_results.empty else pd.DataFrame()
     avg_per_q = df_scores.mean() if not df_scores.empty else pd.Series()
     
     total_analysis = df_info.copy()
     total_analysis['평균득점'] = total_analysis['문항번호'].apply(lambda x: avg_per_q.get(str(x), 0))
-    total_analysis['영역'] = total_analysis['영역'].str.replace('문제해결력', '문제\n해결력')
     
     avg_cat_ratio = (total_analysis.groupby('영역')['평균득점'].sum() / total_analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
     unit_avg_data = total_analysis.groupby('단원').agg({'평균득점': 'sum'})
     unit_avg_data = unit_avg_data.reindex([u for u in unit_order if u in unit_avg_data.index])
     
-    return df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_int
+    return df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary
 
 def generate_jeet_expert_report(target_name, selected_test):
     try:
-        df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_int = prepare_report_data(selected_test)
+        df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary = prepare_report_data(selected_test)
         student_found = False
         img_buffer = io.BytesIO()
         
@@ -327,8 +346,7 @@ def generate_jeet_expert_report(target_name, selected_test):
             student_grade = s_row.get('학년', '')
             
             analysis = df_info.copy()
-            analysis['영역'] = analysis['영역'].str.replace('문제해결력', '문제\n해결력')
-            analysis['정답여부'] = [safe_to_int(s_row.get(str(q), 0)) for q in analysis['문항번호']]
+            analysis['정답여부'] = [safe_to_binary(s_row.get(str(q), 0)) for q in analysis['문항번호']]
             analysis['득점'] = analysis['정답여부'] * analysis['배점']
             
             cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
@@ -351,7 +369,7 @@ def generate_jeet_expert_report(target_name, selected_test):
 
 def generate_batch_report(target_class, selected_test, selected_students=None):
     try:
-        df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_int = prepare_report_data(selected_test)
+        df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary = prepare_report_data(selected_test)
         
         class_students = df_results[df_results['반'].astype(str).str.strip() == str(target_class).strip()]
         
@@ -372,8 +390,7 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                 student_grade = s_row.get('학년', '')
                 
                 analysis = df_info.copy()
-                analysis['영역'] = analysis['영역'].str.replace('문제해결력', '문제\n해결력')
-                analysis['정답여부'] = [safe_to_int(s_row.get(str(q), 0)) for q in analysis['문항번호']]
+                analysis['정답여부'] = [safe_to_binary(s_row.get(str(q), 0)) for q in analysis['문항번호']]
                 analysis['득점'] = analysis['정답여부'] * analysis['배점']
                 
                 cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
@@ -397,7 +414,7 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 
-# --- 5. Stream 추이 UI 구성 ---
+# --- 5. Stream UI 구성 ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 
 if st.sidebar.button("🔄 데이터베이스 새로고침", use_container_width=True):
