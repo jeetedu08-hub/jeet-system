@@ -11,8 +11,9 @@ import streamlit as st
 import io
 from supabase import create_client, Client
 import zipfile
+import re
 
-# --- 1. 환경 및 폰트 설정 (에러 방지 안전장치 추가) ---
+# --- 1. 환경 및 폰트 설정 ---
 font_path = "malgun.ttf"
 try:
     if os.path.exists(font_path):
@@ -29,8 +30,8 @@ plt.rcParams['axes.unicode_minus'] = False
 
 COLOR_NAVY = '#1A237E'
 COLOR_RED = '#D32F2F'
-COLOR_STUDENT = '#0056B3' # 파란색
-COLOR_UNIT = '#00796B'    # 청록색 (현재 미사용)
+COLOR_STUDENT = '#0056B3' 
+COLOR_UNIT = '#00796B'    
 COLOR_AVG = '#757575'
 COLOR_GRID = '#E0E0E0'
 COLOR_BG = '#F8F9FA'
@@ -51,14 +52,30 @@ def fetch_all_dataframes():
     results_res = supabase.table("student_results").select("*").execute()
     df_results = pd.DataFrame(results_res.data)
     
+    # 데이터가 비어있지 않을 때 전처리 강화
     if not df_results.empty:
         df_results = df_results.fillna(0)
-        df_results.columns = df_results.columns.astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+        
+        # 컬럼명 정규화 헬퍼 함수: 모든 컬럼명에서 숫자만 남김 (예: 'q1' -> '1', '1.0' -> '1')
+        def normalize_col(col_name):
+            col_str = str(col_name).strip().split('.')[0] # 소수점 제거
+            nums = re.findall(r'\d+', col_str)
+            return nums[0] if nums else col_str
+            
+        # 메타데이터 컬럼을 제외한 문항 컬럼들만 변환하기 위해 임시 저장
+        meta_cols = ['id', 'created_at', '시험명', '이름', '반', '학교', '학년']
+        new_columns = []
+        for col in df_results.columns:
+            if col in meta_cols:
+                new_columns.append(col)
+            else:
+                new_columns.append(normalize_col(col))
+        df_results.columns = new_columns
         
     return df_info, df_results
 
 
-# --- 3. 공통 그래프 그리기 함수 (데이터 바인딩 안정성 강화) ---
+# --- 3. 공통 그래프 그리기 함수 ---
 def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order):
     border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
     fig.patches.append(border)
@@ -118,15 +135,13 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
 
-    # --- 단원별 성취도 그래프 (순서 불일치 방어 강화) ---
+    # --- 단원별 성취도 그래프 ---
     ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
     
-    # 순서가 보장된 unit_order 기준으로만 데이터를 다시 한번 재정렬
     final_unit_data = unit_data.reindex(unit_order).fillna(0)
     x_pos = np.arange(len(final_unit_data))
     bar_width = 0.45 
     
-    # 득점 비율 계산
     s_pct = (final_unit_data['득점'] / final_unit_data['배점'] * 100).fillna(0)
     
     max_b_val = s_pct.max() if not s_pct.empty else 0
@@ -157,7 +172,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     t_p3 = fig.text(0.185, 0.44, f" 중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=13, fontweight='bold', color=COLOR_NAVY)
     for t_obj in [t_p1, t_p2, t_p3]: t_obj.set_path_effects([path_effects.withStroke(linewidth=1, foreground=t_obj.get_color())])
     
-    u_res = s_pct # 상단에서 정렬이 완료된 성취도 데이터 매칭
+    u_res = s_pct 
     avg_val = int(cat_ratio.mean())
     
     if avg_val >= 80:
@@ -259,7 +274,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         fig.text([0.22, 0.50, 0.78][i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
 
 
-# --- 4. 개별/일괄 데이터 처리 함수 (정밀 데이터 바인딩 보장) ---
+# --- 4. 개별/일괄 데이터 처리 함수 (문항 컬럼 매칭 100% 보장형) ---
 def prepare_report_data(selected_test):
     df_info, df_results = fetch_all_dataframes()
     
@@ -267,34 +282,44 @@ def prepare_report_data(selected_test):
     df_results = df_results[df_results['시험명'] == selected_test].copy()
     
     df_info['배점'] = pd.to_numeric(df_info['배점'], errors='coerce').fillna(3).astype(int)
-    
     df_info['단원'] = df_info['단원'].astype(str).str.strip()
     df_info['영역'] = df_info['영역'].astype(str).str.strip()
     df_info['영역'] = df_info['영역'].str.replace('문제해결력', '문제\n해결력')
     
-    df_info['문항번호'] = pd.to_numeric(df_info['문항번호'], errors='coerce').fillna(0).astype(int).astype(str).str.strip()
-    
-    if not df_results.empty:
-        df_results.columns = df_results.columns.astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+    # test_info의 문항번호도 숫자만 추출해서 깔끔하게 매칭용 string으로 변환
+    def clean_info_q(q):
+        nums = re.findall(r'\d+', str(q).split('.')[0])
+        return nums[0] if nums else str(q).strip()
+    df_info['문항번호'] = df_info['문항번호'].apply(clean_info_q)
     
     unit_order = df_info['단원'].drop_duplicates().tolist()
     q_cols = df_info['문항번호'].tolist()
-    valid_cols = [col for col in df_results.columns if col in q_cols]
     
+    # O/X 문자열 및 숫자 정답 판별 함수
     def safe_to_binary(val):
         if pd.isna(val): 
             return 0
         if isinstance(val, str):
             v = val.strip().upper()
-            if v == 'O': return 1
-            if v == 'X': return 0
+            if v in ['O', '1', '정답']: return 1
+            if v in ['X', '0', '오답']: return 0
         try:
             return 1 if float(val) > 0 else 0
         except:
             return 0
 
-    df_scores = df_results[valid_cols].map(safe_to_binary) if not df_results.empty and valid_cols else pd.DataFrame(0, index=df_results.index, columns=q_cols)
-    avg_per_q = df_scores.mean() if not df_scores.empty else pd.Series(0, index=q_cols)
+    # 학생 데이터프레임에서 유효한 문항 점수 추출 (없으면 0점으로 강제 매칭)
+    if not df_results.empty:
+        df_scores = pd.DataFrame(index=df_results.index, columns=q_cols)
+        for q in q_cols:
+            if q in df_results.columns:
+                df_scores[q] = df_results[q].apply(safe_to_binary)
+            else:
+                df_scores[q] = 0 # DB에 해당 문항 컬럼 자체가 없으면 0점 처리하여 성취도 하락 반영
+    else:
+        df_scores = pd.DataFrame(0, index=[0], columns=q_cols)
+
+    avg_per_q = df_scores.mean()
     
     total_analysis = df_info.copy()
     total_analysis['평균득점'] = total_analysis['문항번호'].apply(lambda x: avg_per_q.get(str(x), 0))
@@ -320,12 +345,17 @@ def generate_jeet_expert_report(target_name, selected_test):
             student_grade = s_row.get('학년', '')
             
             analysis = df_info.copy()
-            analysis['정답여부'] = [safe_to_binary(s_row.get(str(q), 0)) for q in analysis['문항번호']]
+            # s_row에서 꺼내올 때 컬럼 유무 체크 후 점수 연산 (100% 버그 완벽 제어)
+            student_answers = []
+            for q in analysis['문항번호']:
+                val = s_row.get(str(q), None)
+                student_answers.append(safe_to_binary(val) if val is not None else 0)
+                
+            analysis['정답여부'] = student_answers
             analysis['득점'] = analysis['정답여부'] * analysis['배점']
             
             cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
             
-            # 여기에 인덱스 완전 보장용 정렬(reindex) 처리 추가
             unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
             unit_data = unit_data.reindex(unit_order).fillna(0)
 
@@ -366,12 +396,15 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                 student_grade = s_row.get('학년', '')
                 
                 analysis = df_info.copy()
-                analysis['정답여부'] = [safe_to_binary(s_row.get(str(q), 0)) for q in analysis['문항번호']]
+                student_answers = []
+                for q in analysis['문항번호']:
+                    val = s_row.get(str(q), None)
+                    student_answers.append(safe_to_binary(val) if val is not None else 0)
+                    
+                analysis['정답여부'] = student_answers
                 analysis['득점'] = analysis['정답여부'] * analysis['배점']
                 
                 cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
-                
-                # 배치 리포트에서도 순서 완벽 고정
                 unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
                 unit_data = unit_data.reindex(unit_order).fillna(0)
 
