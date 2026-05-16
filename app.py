@@ -68,9 +68,9 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 
     if os.path.exists("logo.png"):
         logo_img = plt.imread("logo.png")
-        logo_ax = fig.add_axes([0.80, 0.915, 0.15, 0.045], zorder=15)
-        logo_ax.imshow(logo_img)
-        logo_ax.axis('off')
+        logo_img_axes = fig.add_axes([0.80, 0.915, 0.15, 0.045], zorder=15)
+        logo_img_axes.imshow(logo_img)
+        logo_img_axes.axis('off')
 
     txt_jeet = fig.text(0.31, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
     txt_title = fig.text(0.33, 0.88, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
@@ -85,7 +85,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
     txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
 
-    # --- 방사형 그래프 (크기 자동 조절 + 빨간색으로 변경) ---
+    # --- 방사형 그래프 ---
     ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
     all_cats = cat_ratio.index.tolist()
     ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
@@ -94,9 +94,8 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     s_vals = s_ordered.values.tolist() + [s_ordered.values[0]]
     angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False).tolist() + [0]
     
-    # 동적 스케일링: 학생의 최고 점수를 기준으로 한도를 정함
     max_s_val = max(s_vals) if len(s_vals) > 0 else 0
-    ax1_limit = max(45, min(110, max_s_val + (max_s_val * 0.25) + 10)) # 최소 45%, 상단 여유 확보
+    ax1_limit = max(45, min(110, max_s_val + (max_s_val * 0.25) + 10))
     
     ax1.set_theta_direction(-1); ax1.set_theta_offset(np.pi/2.0)
     ax1.plot(angles, s_vals, color=COLOR_RED, linewidth=2.5, label='학생 점수')
@@ -104,14 +103,11 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     
     for i in range(len(labels)):
         angle = angles[i]; label_text = labels[i]
-        
-        # 글자 위치를 그래프 바깥선에 예쁘게 밀착되도록 간격 대폭 축소
-        dist_tb = ax1_limit * 1.05  # 위, 아래 글씨 간격
-        dist_lr = ax1_limit * 1.02  # 양옆 글씨 간격
+        dist_tb = ax1_limit * 1.05  
+        dist_lr = ax1_limit * 1.02  
         
         ha, va, dist = ('center', 'bottom', dist_tb) if angle == 0 else ('left', 'center', dist_lr) if 0 < angle < np.pi else ('center', 'top', dist_tb) if angle == np.pi else ('right', 'center', dist_lr)
         
-        # 두 줄짜리 텍스트(문제해결력)일 경우에만 살짝 더 여백을 줌
         if '문제\n해결력' in label_text: 
             dist += (ax1_limit * 0.08)
             ha = 'left' if 0 < angle < np.pi else 'right'
@@ -119,7 +115,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         ax1.text(angle, dist, label_text, fontsize=10, fontweight='bold', va=va, ha=ha, color=COLOR_NAVY)
         
         s_v = int(s_vals[i])
-        # 점수 텍스트는 겹치지 않게 바깥쪽/안쪽으로 동적 띄어쓰기
         td = s_v - (ax1_limit * 0.12) if s_v > ax1_limit * 0.85 else s_v + (ax1_limit * 0.12)
         txt_s = ax1.text(angle, td, f"{s_v}%", fontsize=9, fontweight='bold', color=COLOR_RED, va='center', ha='center')
         txt_s.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
@@ -127,15 +122,14 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
 
-    # --- 단원별 성취도 그래프 (크기 자동 조절 + 파란색으로 변경) ---
+    # --- 단원별 성취도 그래프 ---
     ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
     x_pos = np.arange(len(unit_data))
     bar_width = 0.45 
     s_pct = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
     
-    # 막대 그래프 동적 스케일링: 눈금이 너무 높아서 막대가 바닥에 붙는 현상 해결
     max_b_val = s_pct.max() if not s_pct.empty else 0
-    ax2_limit = max(40, min(110, max_b_val + (max_b_val * 0.25) + 15)) # 최고점에 비례해 유동적 여백 제공
+    ax2_limit = max(40, min(110, max_b_val + (max_b_val * 0.25) + 15)) 
     
     ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3)
     
@@ -148,8 +142,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     for i in range(len(x_pos)):
         val = int(s_pct.iloc[i])
         pos = x_pos[i]
-        
-        # 막대 위쪽에 일정한 비율로 텍스트 예쁘게 배치
         y_p = val + (ax2_limit * 0.04)
         t = ax2.text(pos, y_p, f"{val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_STUDENT)
         t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
@@ -166,7 +158,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     u_res = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
     avg_val = int(cat_ratio.mean())
     
-    # 1. 총평
     if avg_val >= 80:
         eval_tier = "심화 개념의 완벽한 체득과 날카로운 수학적 직관력을 겸비한 최상위권 수준의 성취를 보여줍니다. 고난도 문항 해결 능력이 탁월하며 자기 주도적 심화 학습이 충분히 가능한 상태"
     elif avg_val >= 60:
@@ -178,7 +169,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         
     diag_total = f"{student_name} 학생은 성취도 {avg_val}%를 기록하며, 현재 {eval_tier}입니다."
 
-    # 2. 영역별 분석
     c_best = cat_ratio[cat_ratio >= 80].index.str.replace('\n', '').tolist()
     c_good = cat_ratio[(cat_ratio >= 50) & (cat_ratio < 80)].index.str.replace('\n', '').tolist()
     c_weak = cat_ratio[(cat_ratio >= 20) & (cat_ratio < 50)].index.str.replace('\n', '').tolist()
@@ -190,7 +180,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     if c_weak: diag_combined += f"{', '.join([f'[{c}]' for c in c_weak])} 영역은 복합 개념을 문제에 투영하는 과정에서 다소 고전하는 모습이 보입니다. 단편적인 문제 풀이보다는 개념 간의 유기적 연결성을 이해하고 유사 유형을 집중 분석하는 보완 작업이 필요합니다. "
     if c_warn: diag_combined += f"무엇보다 {', '.join([f'[{c}]' for c in c_warn])} 영역은 단원 간 연계성이 높은 만큼, 기초 개념의 재정립과 필수 유형에 대한 집중 학습이 필요합니다. 단계별 맞춤 문항을 통해 이해도를 근본적으로 끌어올려 실력을 끌어올릴 필요가 있습니다. "
 
-    # 3. 단원별 분석
     g_best = u_res[u_res >= 80].index.tolist()
     g_good = u_res[(u_res >= 50) & (u_res < 80)].index.tolist()
     g_weak = u_res[(u_res >= 20) & (u_res < 50)].index.tolist()
@@ -203,29 +192,23 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     if not (g_best or g_good or g_weak or g_warn):
         diag_combined += "전반적인 단원별 성취도가 매우 균형 있게 나타나고 있습니다. 어느 한 쪽으로 치우치지 않는 고른 학습 균형이 큰 강점입니다."
 
-    # 4. 향후 솔루션
     weak_list = u_res[u_res < 40].index.tolist()
-    avg_score = u_res.mean() # 전체 단원 평균 점수를 기준으로 구간 분류
+    avg_score = u_res.mean()
 
-    # 취약 단원 텍스트 처리 (취약 단원이 없을 경우 자연스럽게 넘어가도록 방어 코드 추가)
     units_text = ', '.join([f'<{u}>' for u in weak_list]) if weak_list else "핵심"
 
-    # [1구간] 80점 이상: 뛰어난 성취와 더 큰 도약
     if avg_score >= 80:
         sol_text = (
             f"{student_name} 학생은 이미 훌륭한 학습 태도와 깊이 있는 이해력을 바탕으로 뛰어난 성취를 보여주고 있습니다. 지금의 우수함에 안주하지 않고 한 단계 더 도약할 수 있도록, JEET CARE+를 통해 고난도 사고력 문제를 즐길 수 있는 환경을 만들겠습니다. JDM을 활용하여 자기주도학습의 습관을 만들고, 커리큘럼과 연계된 주말몰입수업으로 심화를 다지면서 더 큰 성장을 향해 나아가겠습니다."
         )
-    # [2구간] 50점 이상 ~ 80점 미만: 꾸준한 성장과 정교한 다듬기
     elif avg_score >= 50:
         sol_text = (
             f"배운 내용을 자기 것으로 만드는 과정이 순조로우며, 다음 단계를 향해 꾸준한 성장을 이어가고 있습니다. JEET CARE+를 통해 응용, 심화 문제를 연습하고, JDM을 활용하여 자기주도학습의 습관을 기르도록 지도하겠습니다. 또한 커리큘럼과 연계된 주말몰입수업으로, 한층 더 성취도를 끌어올리겠습니다."
         )
-    # [3구간] 20점 이상 ~ 50점 미만: 성장을 위한 에너지 비축
     elif avg_score >= 20:
         sol_text = (
             f"지금은 {student_name} 학생이 한 단계 더 성장하기 위해 에너지를 단단하게 모으는 시기입니다. {units_text} 단원처럼 조금은 낯설게 느껴졌던 부분들을 JEET CARE+ 밀착 관리를 통해 친숙한 개념으로 바꿔 가겠습니다. JDM을 활용하여 자기주도학습의 습관을 만들고, 커리큘럼에 연계된 주말몰입수업을 진행하며 수학이 즐거운 과목이 되도록 곁에서 든든하게 격려하며 지도하겠습니다."
         )
-    # [4구간] 20점 미만: 확실한 성장을 위한 기초 확립
     else:
         sol_text = (
             f"조금은 느리더라도 기초를 단단히 다지고 가는 것이 결국 가장 확실한 성장의 길임을 믿습니다. {student_name} 학생이 {units_text} 단원의 기초를 편안하게 받아들일 수 있도록, JEET CARE+와 JDM을 활용하여 기초를 다지며 자기주도학습의 습관을 만들고, 커리큘럼에 연계된 주말몰입수업을 진행하며 눈높이 지도를 진행하겠습니다. JEET만의 밀착관리 시스템을 통해 작은 노력들이 모여 큰 성취가 되는 기쁨을 체험하도록 정성을 다해 이끌겠습니다."
@@ -233,18 +216,15 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 
     sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", diag_combined), ("[JEET 맞춤 솔루션]", sol_text)]
 
-    # ✨ 텍스트 레이아웃 출력부 동적 튜닝 ✨ 
     total_chars = sum(len(content) for _, content in sections)
 
-    # 2. 글자 수에 따른 동적 레이아웃 변수 할당
-    # linespacing=1.6 이 적용된 실제 텍스트 높이를 반영하여 line_height를 대폭 상향
     if total_chars > 800:
         wrap_width = 82        
         main_fs = 6.8          
         sub_fs = 8.5            
-        y_offset = 0.012       # 소제목과 본문 사이 간격
-        section_gap = 0.025    # 섹션이 끝난 후 다음 소제목 전까지의 고정 여백
-        line_height = 0.014    # 줄당 차지하는 실제 높이
+        y_offset = 0.012       
+        section_gap = 0.025    
+        line_height = 0.014    
     elif total_chars > 600:
         wrap_width = 74
         main_fs = 7.5
@@ -262,20 +242,13 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 
     curr_y = 0.415 
     for subtitle, content in sections:
-        # 1. 소제목 출력
         stxt = fig.text(0.11, curr_y, subtitle, fontsize=sub_fs, fontweight='bold', color='#222')
         stxt.set_path_effects([path_effects.withStroke(linewidth=0.5, foreground='#222')])
         
-        # 본문 자동 줄바꿈
         wrapped_content = textwrap.fill(content, width=wrap_width)
-        
-        # 2. 본문 출력
         ctxt = fig.text(0.11, curr_y - y_offset, wrapped_content, fontsize=main_fs, linespacing=1.6, va='top', color='#333')
         
-        # 3. 다음 섹션 시작 위치 계산 (오차 수정 공식 적용)
         num_lines = len(wrapped_content.split('\n'))
-        
-        # 다음 좌표 = 현재 Y좌표 - (본문시작점까지의 여백 + 본문전체높이 + 다음섹션전까지의 고정여백)
         curr_y -= (y_offset + (num_lines * line_height) + section_gap)
 
     line_footer = plt.Line2D([0.05, 0.95], [0.10, 0.10], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure); fig.lines.append(line_footer)
@@ -285,7 +258,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         fig.text([0.22, 0.50, 0.78][i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
 
 
-# --- 4. 개별/일괄 데이터 처리 함수 (PNG 및 ZIP 적용) ---
+# --- 4. 개별/일괄 데이터 처리 함수 (★정밀 매칭 및 결측 보완 적용) ---
 def prepare_report_data(selected_test):
     df_info, df_results = fetch_all_dataframes()
     
@@ -293,16 +266,20 @@ def prepare_report_data(selected_test):
     df_info = df_info[df_info['시험명'] == selected_test].copy()
     df_results = df_results[df_results['시험명'] == selected_test].copy()
     
-    # 배점 처리
-    df_info['배점'] = df_info['배점'].replace('', 3).fillna(3).astype(int)
+    # 배점 처리 (NULL 및 결측치를 유동적인 숫자형으로 가공 후 기본값 3점 부여)
+    df_info['배점'] = pd.to_numeric(df_info['배점'], errors='coerce').fillna(3).astype(int)
     
     # 단원명과 영역명 앞뒤 공백 완전 제거 (오타 방지)
     df_info['단원'] = df_info['단원'].astype(str).str.strip()
     df_info['영역'] = df_info['영역'].astype(str).str.strip()
     df_info['영역'] = df_info['영역'].str.replace('문제해결력', '문제\n해결력')
     
-    # 문항번호를 float -> int -> str 순으로 깔끔하게 변환 ('1.0' -> '1')
-    df_info['문항번호'] = pd.to_numeric(df_info['문항번호'], errors='coerce').fillna(0).astype(int).astype(str)
+    # 문항번호 데이터 타입을 순수 문자열 '1', '2' 형태로 변환 및 공백 제거 (타입 불일치 해결 핵심)
+    df_info['문항번호'] = pd.to_numeric(df_info['문항번호'], errors='coerce').fillna(0).astype(int).astype(str).str.strip()
+    
+    # 학생 결과 테이블의 컬럼명도 강제로 모두 공백 제거된 문자열 타입으로 일치화
+    if not df_results.empty:
+        df_results.columns = df_results.columns.astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
     
     unit_order = df_info['단원'].drop_duplicates().tolist()
     q_cols = df_info['문항번호'].tolist()
@@ -310,18 +287,20 @@ def prepare_report_data(selected_test):
     
     # O/X 문자열 및 이상값 대응을 위한 강화된 정답 판별 함수
     def safe_to_binary(val):
+        if pd.isna(val): 
+            return 0
         if isinstance(val, str):
             v = val.strip().upper()
             if v == 'O': return 1
             if v == 'X': return 0
         try:
-            # 숫자로 변환 가능할 때, 0보다 크면 무조건 정답(1) 처리
             return 1 if float(val) > 0 else 0
         except:
             return 0
 
-    df_scores = df_results[valid_cols].map(safe_to_binary) if not df_results.empty else pd.DataFrame()
-    avg_per_q = df_scores.mean() if not df_scores.empty else pd.Series()
+    # 유효하게 매칭되는 문항 컬럼으로만 집계 데이터 구성
+    df_scores = df_results[valid_cols].map(safe_to_binary) if not df_results.empty and valid_cols else pd.DataFrame(0, index=df_results.index, columns=q_cols)
+    avg_per_q = df_scores.mean() if not df_scores.empty else pd.Series(0, index=q_cols)
     
     total_analysis = df_info.copy()
     total_analysis['평균득점'] = total_analysis['문항번호'].apply(lambda x: avg_per_q.get(str(x), 0))
@@ -331,6 +310,7 @@ def prepare_report_data(selected_test):
     unit_avg_data = unit_avg_data.reindex([u for u in unit_order if u in unit_avg_data.index])
     
     return df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary
+
 
 def generate_jeet_expert_report(target_name, selected_test):
     try:
@@ -346,6 +326,7 @@ def generate_jeet_expert_report(target_name, selected_test):
             student_grade = s_row.get('학년', '')
             
             analysis = df_info.copy()
+            # s_row에서 꺼내올 때도 문항 번호를 강제 str 타입으로 매칭 처리
             analysis['정답여부'] = [safe_to_binary(s_row.get(str(q), 0)) for q in analysis['문항번호']]
             analysis['득점'] = analysis['정답여부'] * analysis['배점']
             
@@ -356,7 +337,6 @@ def generate_jeet_expert_report(target_name, selected_test):
             fig = plt.figure(figsize=(8.27, 11.69))
             draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
             
-            # PDF 대신 PNG로 고화질 저장 (dpi 300)
             fig.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             break
@@ -366,6 +346,7 @@ def generate_jeet_expert_report(target_name, selected_test):
         img_buffer.seek(0)
         return True, img_buffer, "리포트 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
+
 
 def generate_batch_report(target_class, selected_test, selected_students=None):
     try:
@@ -390,6 +371,7 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                 student_grade = s_row.get('학년', '')
                 
                 analysis = df_info.copy()
+                # s_row에서 꺼내올 때도 문항 번호를 강제 str 타입으로 매칭 처리
                 analysis['정답여부'] = [safe_to_binary(s_row.get(str(q), 0)) for q in analysis['문항번호']]
                 analysis['득점'] = analysis['정답여부'] * analysis['배점']
                 
@@ -400,12 +382,10 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                 fig = plt.figure(figsize=(8.27, 11.69))
                 draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
                 
-                # 각각의 피규어를 임시 버퍼에 PNG로 저장
                 temp_img_buffer = io.BytesIO()
                 fig.savefig(temp_img_buffer, format='png', dpi=300, bbox_inches='tight')
                 plt.close(fig)
                 
-                # 압축 파일 내부에 '학생이름_리포트.png' 형식으로 추가
                 file_name = f"{student_name}_리포트.png"
                 zip_file.writestr(file_name, temp_img_buffer.getvalue())
             
@@ -414,7 +394,7 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 
-# --- 5. Stream UI 구성 ---
+# --- 5. Streamlit UI 구성 ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 
 if st.sidebar.button("🔄 데이터베이스 새로고침", use_container_width=True):
@@ -473,7 +453,6 @@ with tab1:
                 if not clean_name: st.error("⚠ 이름을 입력해주세요.")
                 else:
                     try:
-                        # Supabase 테이블에 Insert할 딕셔너리 구성
                         new_record = {
                             "시험명": selected_test,
                             "이름": clean_name,
@@ -481,7 +460,6 @@ with tab1:
                             "학교": input_school,
                             "학년": input_grade
                         }
-                        # 각 문항의 정답 여부를 레코드에 추가
                         for q_num, ans in answers.items():
                             new_record[str(q_num)] = ans
 
