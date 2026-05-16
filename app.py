@@ -43,26 +43,32 @@ def init_supabase() -> Client:
     key: str = st.secrets["SUPABASE_KEY"]
     return create_client(url, key)
 
-@st.cache_data(ttl=120)
+# 💡 실시간 반영을 위해 ttl을 1초로 대폭 줄이거나 캐시를 잠시 우회합니다.
+@st.cache_data(ttl=1)
 def fetch_all_dataframes():
     supabase = init_supabase()
     info_res = supabase.table("test_info").select("*").execute()
     df_info = pd.DataFrame(info_res.data)
     
+    # 💡 중요: 최신 입력되거나 수정된 데이터가 항상 위로 오도록 정렬하여 불러옵니다.
     results_res = supabase.table("student_results").select("*").execute()
     df_results = pd.DataFrame(results_res.data)
     
-    # 데이터가 비어있지 않을 때 전처리 강화
     if not df_results.empty:
+        # id 컬럼이 있다면 최신 데이터가 위로 오도록 역정렬 (중복 이름 방어)
+        if 'id' in df_results.columns:
+            df_results = df_results.sort_values(by='id', ascending=False)
+        elif 'created_at' in df_results.columns:
+            df_results = df_results.sort_values(by='created_at', ascending=False)
+            
         df_results = df_results.fillna(0)
         
-        # 컬럼명 정규화 헬퍼 함수: 모든 컬럼명에서 숫자만 남김 (예: 'q1' -> '1', '1.0' -> '1')
+        # 컬럼명에서 숫자만 남기는 정규화 (q1 -> 1, 1.0 -> 1 대응)
         def normalize_col(col_name):
-            col_str = str(col_name).strip().split('.')[0] # 소수점 제거
+            col_str = str(col_name).strip().split('.')[0]
             nums = re.findall(r'\d+', col_str)
             return nums[0] if nums else col_str
             
-        # 메타데이터 컬럼을 제외한 문항 컬럼들만 변환하기 위해 임시 저장
         meta_cols = ['id', 'created_at', '시험명', '이름', '반', '학교', '학년']
         new_columns = []
         for col in df_results.columns:
@@ -274,7 +280,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         fig.text([0.22, 0.50, 0.78][i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
 
 
-# --- 4. 개별/일괄 데이터 처리 함수 (문항 컬럼 매칭 100% 보장형) ---
+# --- 4. 개별/일괄 데이터 처리 함수 (보안 및 데이터 정밀 검증) ---
 def prepare_report_data(selected_test):
     df_info, df_results = fetch_all_dataframes()
     
@@ -286,7 +292,6 @@ def prepare_report_data(selected_test):
     df_info['영역'] = df_info['영역'].astype(str).str.strip()
     df_info['영역'] = df_info['영역'].str.replace('문제해결력', '문제\n해결력')
     
-    # test_info의 문항번호도 숫자만 추출해서 깔끔하게 매칭용 string으로 변환
     def clean_info_q(q):
         nums = re.findall(r'\d+', str(q).split('.')[0])
         return nums[0] if nums else str(q).strip()
@@ -295,27 +300,27 @@ def prepare_report_data(selected_test):
     unit_order = df_info['단원'].drop_duplicates().tolist()
     q_cols = df_info['문항번호'].tolist()
     
-    # O/X 문자열 및 숫자 정답 판별 함수
+    # 💡 정오답 판별 헬퍼 로직 대폭 강화 (공백, 대소문자, 숫자형 오답 완벽 처리)
     def safe_to_binary(val):
         if pd.isna(val): 
             return 0
-        if isinstance(val, str):
-            v = val.strip().upper()
-            if v in ['O', '1', '정답']: return 1
-            if v in ['X', '0', '오답']: return 0
+        v_str = str(val).strip().upper()
+        if v_str in ['O', '1', '1.0', '정답', 'TRUE']: 
+            return 1
+        if v_str in ['X', '0', '0.0', '오답', 'FALSE', '']: 
+            return 0
         try:
             return 1 if float(val) > 0 else 0
         except:
             return 0
 
-    # 학생 데이터프레임에서 유효한 문항 점수 추출 (없으면 0점으로 강제 매칭)
     if not df_results.empty:
         df_scores = pd.DataFrame(index=df_results.index, columns=q_cols)
         for q in q_cols:
             if q in df_results.columns:
                 df_scores[q] = df_results[q].apply(safe_to_binary)
             else:
-                df_scores[q] = 0 # DB에 해당 문항 컬럼 자체가 없으면 0점 처리하여 성취도 하락 반영
+                df_scores[q] = 0 
     else:
         df_scores = pd.DataFrame(0, index=[0], columns=q_cols)
 
@@ -337,6 +342,7 @@ def generate_jeet_expert_report(target_name, selected_test):
         student_found = False
         img_buffer = io.BytesIO()
         
+        # 💡 위에서 이미 정렬을 마쳤으므로 최신 입력 데이터(가장 위 행) 하나만 매칭하고 즉시 빠져나갑니다.
         for _, s_row in df_results.iterrows():
             student_name = str(s_row.get('이름', '')).strip()
             if not student_name or student_name == '0' or student_name != str(target_name).strip(): continue
@@ -345,7 +351,6 @@ def generate_jeet_expert_report(target_name, selected_test):
             student_grade = s_row.get('학년', '')
             
             analysis = df_info.copy()
-            # s_row에서 꺼내올 때 컬럼 유무 체크 후 점수 연산 (100% 버그 완벽 제어)
             student_answers = []
             for q in analysis['문항번호']:
                 val = s_row.get(str(q), None)
@@ -378,6 +383,9 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
         df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary = prepare_report_data(selected_test)
         
         class_students = df_results[df_results['반'].astype(str).str.strip() == str(target_class).strip()]
+        
+        # 💡 이름별로 중복 데이터가 있을 때 최신 1개만 남기고 중복 제거
+        class_students = class_students.drop_duplicates(subset=['이름'], keep='first')
         
         if selected_students is not None:
             cleaned_selected = [str(s).strip() for s in selected_students]
@@ -514,6 +522,7 @@ with tab3:
     st.subheader(f"[{selected_test}] 반별 전체 심층 분석 일괄 출력")
     
     if '반' in df_results_all.columns:
+        # 💡 반별 탭에서도 최신 데이터를 기준으로 고르게 매칭하기 위해 전체 목록 가공
         all_classes = df_results_all['반'].astype(str).str.strip().unique().tolist()
         class_list = sorted([c for c in all_classes if c and c != '0' and c != 'nan'])
         
@@ -523,7 +532,7 @@ with tab3:
             students_in_class = df_results_all[
                 (df_results_all['시험명'] == selected_test) & 
                 (df_results_all['반'].astype(str).str.strip() == target_class)
-            ]['이름'].astype(str).str.strip().tolist()
+            ]['이름'].astype(str).str.strip().unique().tolist() # 중복 이름 제거하여 콤보박스 표기
             
             students_in_class = sorted([s for s in students_in_class if s and s != '0' and s != 'nan'])
             
