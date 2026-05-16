@@ -45,23 +45,20 @@ def init_supabase() -> Client:
 @st.cache_data(ttl=120)
 def fetch_all_dataframes():
     supabase = init_supabase()
-    # test_info 가져오기
     info_res = supabase.table("test_info").select("*").execute()
     df_info = pd.DataFrame(info_res.data)
     
-    # student_results 가져오기
     results_res = supabase.table("student_results").select("*").execute()
     df_results = pd.DataFrame(results_res.data)
     
     if not df_results.empty:
         df_results = df_results.fillna(0)
-        # 컬럼명을 문자로 바꾼 뒤, 소수점('.0')과 앞뒤 공백을 완벽히 제거
         df_results.columns = df_results.columns.astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
         
     return df_info, df_results
 
 
-# --- 3. 공통 그래프 그리기 함수 (개별/일괄 출력에서 모두 사용) ---
+# --- 3. 공통 그래프 그리기 함수 (데이터 바인딩 안정성 강화) ---
 def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order):
     border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
     fig.patches.append(border)
@@ -75,7 +72,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     txt_jeet = fig.text(0.31, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
     txt_title = fig.text(0.33, 0.88, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
     
-    # 소속 반 정보 가져오기 (없으면 빈 칸)
     student_class = str(s_row.get('반', '')).strip()
     class_text = f"{student_class}  |  " if student_class and student_class != '0' else ""
     info_text = f"학교: {s_row.get('학교', '')}  |  학년: {student_grade}  |  {class_text}이름: {student_name}  |  과정: {selected_test}"
@@ -122,18 +118,24 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
 
-    # --- 단원별 성취도 그래프 ---
+    # --- 단원별 성취도 그래프 (순서 불일치 방어 강화) ---
     ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
-    x_pos = np.arange(len(unit_data))
+    
+    # 순서가 보장된 unit_order 기준으로만 데이터를 다시 한번 재정렬
+    final_unit_data = unit_data.reindex(unit_order).fillna(0)
+    x_pos = np.arange(len(final_unit_data))
     bar_width = 0.45 
-    s_pct = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
+    
+    # 득점 비율 계산
+    s_pct = (final_unit_data['득점'] / final_unit_data['배점'] * 100).fillna(0)
     
     max_b_val = s_pct.max() if not s_pct.empty else 0
     ax2_limit = max(40, min(110, max_b_val + (max_b_val * 0.25) + 15)) 
     
     ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3)
     
-    ax2.set_xticks(x_pos); ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in unit_data.index], fontsize=8, fontweight='bold')
+    ax2.set_xticks(x_pos)
+    ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in final_unit_data.index], fontsize=8, fontweight='bold')
     ax2.tick_params(axis='x', which='both', length=0) 
     ax2.set_ylim(0, ax2_limit); ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
     title2 = ax2.set_title("▶ 단원별 성취도 (%)", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
@@ -155,7 +157,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     t_p3 = fig.text(0.185, 0.44, f" 중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=13, fontweight='bold', color=COLOR_NAVY)
     for t_obj in [t_p1, t_p2, t_p3]: t_obj.set_path_effects([path_effects.withStroke(linewidth=1, foreground=t_obj.get_color())])
     
-    u_res = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
+    u_res = s_pct # 상단에서 정렬이 완료된 성취도 데이터 매칭
     avg_val = int(cat_ratio.mean())
     
     if avg_val >= 80:
@@ -215,7 +217,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         )
 
     sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", diag_combined), ("[JEET 맞춤 솔루션]", sol_text)]
-
     total_chars = sum(len(content) for _, content in sections)
 
     if total_chars > 800:
@@ -258,26 +259,21 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         fig.text([0.22, 0.50, 0.78][i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
 
 
-# --- 4. 개별/일괄 데이터 처리 함수 (★정밀 매칭 및 결측 보완 적용) ---
+# --- 4. 개별/일괄 데이터 처리 함수 (정밀 데이터 바인딩 보장) ---
 def prepare_report_data(selected_test):
     df_info, df_results = fetch_all_dataframes()
     
-    # SettingWithCopyWarning 방지
     df_info = df_info[df_info['시험명'] == selected_test].copy()
     df_results = df_results[df_results['시험명'] == selected_test].copy()
     
-    # 배점 처리 (NULL 및 결측치를 유동적인 숫자형으로 가공 후 기본값 3점 부여)
     df_info['배점'] = pd.to_numeric(df_info['배점'], errors='coerce').fillna(3).astype(int)
     
-    # 단원명과 영역명 앞뒤 공백 완전 제거 (오타 방지)
     df_info['단원'] = df_info['단원'].astype(str).str.strip()
     df_info['영역'] = df_info['영역'].astype(str).str.strip()
     df_info['영역'] = df_info['영역'].str.replace('문제해결력', '문제\n해결력')
     
-    # 문항번호 데이터 타입을 순수 문자열 '1', '2' 형태로 변환 및 공백 제거 (타입 불일치 해결 핵심)
     df_info['문항번호'] = pd.to_numeric(df_info['문항번호'], errors='coerce').fillna(0).astype(int).astype(str).str.strip()
     
-    # 학생 결과 테이블의 컬럼명도 강제로 모두 공백 제거된 문자열 타입으로 일치화
     if not df_results.empty:
         df_results.columns = df_results.columns.astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
     
@@ -285,7 +281,6 @@ def prepare_report_data(selected_test):
     q_cols = df_info['문항번호'].tolist()
     valid_cols = [col for col in df_results.columns if col in q_cols]
     
-    # O/X 문자열 및 이상값 대응을 위한 강화된 정답 판별 함수
     def safe_to_binary(val):
         if pd.isna(val): 
             return 0
@@ -298,7 +293,6 @@ def prepare_report_data(selected_test):
         except:
             return 0
 
-    # 유효하게 매칭되는 문항 컬럼으로만 집계 데이터 구성
     df_scores = df_results[valid_cols].map(safe_to_binary) if not df_results.empty and valid_cols else pd.DataFrame(0, index=df_results.index, columns=q_cols)
     avg_per_q = df_scores.mean() if not df_scores.empty else pd.Series(0, index=q_cols)
     
@@ -326,13 +320,14 @@ def generate_jeet_expert_report(target_name, selected_test):
             student_grade = s_row.get('학년', '')
             
             analysis = df_info.copy()
-            # s_row에서 꺼내올 때도 문항 번호를 강제 str 타입으로 매칭 처리
             analysis['정답여부'] = [safe_to_binary(s_row.get(str(q), 0)) for q in analysis['문항번호']]
             analysis['득점'] = analysis['정답여부'] * analysis['배점']
             
             cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
+            
+            # 여기에 인덱스 완전 보장용 정렬(reindex) 처리 추가
             unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
-            unit_data = unit_data.reindex([u for u in unit_order if u in unit_data.index])
+            unit_data = unit_data.reindex(unit_order).fillna(0)
 
             fig = plt.figure(figsize=(8.27, 11.69))
             draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
@@ -371,13 +366,14 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                 student_grade = s_row.get('학년', '')
                 
                 analysis = df_info.copy()
-                # s_row에서 꺼내올 때도 문항 번호를 강제 str 타입으로 매칭 처리
                 analysis['정답여부'] = [safe_to_binary(s_row.get(str(q), 0)) for q in analysis['문항번호']]
                 analysis['득점'] = analysis['정답여부'] * analysis['배점']
                 
                 cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
+                
+                # 배치 리포트에서도 순서 완벽 고정
                 unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
-                unit_data = unit_data.reindex([u for u in unit_order if u in unit_data.index])
+                unit_data = unit_data.reindex(unit_order).fillna(0)
 
                 fig = plt.figure(figsize=(8.27, 11.69))
                 draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
