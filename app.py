@@ -43,19 +43,16 @@ def init_supabase() -> Client:
     key: str = st.secrets["SUPABASE_KEY"]
     return create_client(url, key)
 
-# 💡 실시간 반영을 위해 ttl을 1초로 대폭 줄이거나 캐시를 잠시 우회합니다.
 @st.cache_data(ttl=1)
 def fetch_all_dataframes():
     supabase = init_supabase()
     info_res = supabase.table("test_info").select("*").execute()
     df_info = pd.DataFrame(info_res.data)
     
-    # 💡 중요: 최신 입력되거나 수정된 데이터가 항상 위로 오도록 정렬하여 불러옵니다.
     results_res = supabase.table("student_results").select("*").execute()
     df_results = pd.DataFrame(results_res.data)
     
     if not df_results.empty:
-        # id 컬럼이 있다면 최신 데이터가 위로 오도록 역정렬 (중복 이름 방어)
         if 'id' in df_results.columns:
             df_results = df_results.sort_values(by='id', ascending=False)
         elif 'created_at' in df_results.columns:
@@ -63,7 +60,6 @@ def fetch_all_dataframes():
             
         df_results = df_results.fillna(0)
         
-        # 컬럼명에서 숫자만 남기는 정규화 (q1 -> 1, 1.0 -> 1 대응)
         def normalize_col(col_name):
             col_str = str(col_name).strip().split('.')[0]
             nums = re.findall(r'\d+', col_str)
@@ -280,7 +276,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         fig.text([0.22, 0.50, 0.78][i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
 
 
-# --- 4. 개별/일괄 데이터 처리 함수 (보안 및 데이터 정밀 검증) ---
+# --- 4. 데이터 가공 헬퍼 함수 ---
 def prepare_report_data(selected_test):
     df_info, df_results = fetch_all_dataframes()
     
@@ -300,7 +296,6 @@ def prepare_report_data(selected_test):
     unit_order = df_info['단원'].drop_duplicates().tolist()
     q_cols = df_info['문항번호'].tolist()
     
-    # 💡 정오답 판별 헬퍼 로직 대폭 강화 (공백, 대소문자, 숫자형 오답 완벽 처리)
     def safe_to_binary(val):
         if pd.isna(val): 
             return 0
@@ -342,7 +337,6 @@ def generate_jeet_expert_report(target_name, selected_test):
         student_found = False
         img_buffer = io.BytesIO()
         
-        # 💡 위에서 이미 정렬을 마쳤으므로 최신 입력 데이터(가장 위 행) 하나만 매칭하고 즉시 빠져나갑니다.
         for _, s_row in df_results.iterrows():
             student_name = str(s_row.get('이름', '')).strip()
             if not student_name or student_name == '0' or student_name != str(target_name).strip(): continue
@@ -383,8 +377,6 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
         df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary = prepare_report_data(selected_test)
         
         class_students = df_results[df_results['반'].astype(str).str.strip() == str(target_class).strip()]
-        
-        # 💡 이름별로 중복 데이터가 있을 때 최신 1개만 남기고 중복 제거
         class_students = class_students.drop_duplicates(subset=['이름'], keep='first')
         
         if selected_students is not None:
@@ -466,46 +458,99 @@ df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 
 tab1, tab2, tab3 = st.tabs(["✍️ 성적 입력", "📊 개별 리포트 출력", "📚 반별 일괄 리포트 출력"])
 
+# --- 💡 탭 1 수정 및 기능 추가 완료 단락 ---
 with tab1:
     st.subheader(f"[{selected_test}] 신규 학생 성적 입력")
-    question_numbers = df_info_filtered['문항번호'].tolist()
-    if question_numbers:
-        with st.form("data_input_form", clear_on_submit=True):
-            ci1, ci2, ci3, ci4 = st.columns(4)
-            with ci1: input_name = st.text_input("이름")
-            with ci2: input_class = st.text_input("반 (예: A반)")
-            with ci3: input_school = st.text_input("학교")
-            with ci4: input_grade = st.selectbox("학년", ["중1", "중2", "중3"])
-            st.markdown("---")
-            answers = {}
-            for i in range(0, len(question_numbers), 5):
-                cols = st.columns(5)
-                for j, q_num in enumerate(question_numbers[i:i+5]):
-                    with cols[j]:
-                        choice = st.radio(f"**{q_num}번**", options=["O", "X"], horizontal=True, key=f"q_{q_num}")
-                        answers[str(q_num)] = 1 if choice == "O" else 0
-            
-            if st.form_submit_button("DB에 성적 저장하기", type="primary"):
-                clean_name = input_name.strip()
-                if not clean_name: st.error("⚠ 이름을 입력해주세요.")
-                else:
-                    try:
-                        new_record = {
-                            "시험명": selected_test,
-                            "이름": clean_name,
-                            "반": input_class,
-                            "학교": input_school,
-                            "학년": input_grade
-                        }
-                        for q_num, ans in answers.items():
-                            new_record[str(q_num)] = ans
+    
+    # 시험 정보 꼬임 방지를 위한 문항번호별 배점 맵 세팅
+    if not df_info_filtered.empty:
+        q_weight_map = dict(zip(
+            df_info_filtered['문항번호'].astype(str), 
+            df_info_filtered['배점'].astype(int)
+        ))
+        question_numbers = list(q_weight_map.keys())
+    else:
+        q_weight_map = {}
+        question_numbers = []
 
-                        supabase = init_supabase()
-                        supabase.table("student_results").insert(new_record).execute()
-                        
-                        st.success("성적이 DB에 안전하게 저장되었습니다!")
-                        st.cache_data.clear() 
-                    except Exception as e: st.error(f"저장 중 오류 발생: {e}")
+    if question_numbers:
+        # 실시간 계산 대시보드 렌더링을 위해 st.form 바깥에 필드 배치
+        ci1, ci2, ci3, ci4 = st.columns(4)
+        with ci1: input_name = st.text_input("이름", key="input_name")
+        with ci2: input_class = st.text_input("반 (예: A반)", key="input_class")
+        with ci3: input_school = st.text_input("학교", key="input_school")
+        with ci4: input_grade = st.selectbox("학년", ["중1", "중2", "중3"], key="input_grade")
+        
+        st.markdown("---")
+        
+        answers = {}
+        for i in range(0, len(question_numbers), 5):
+            cols = st.columns(5)
+            for j, q_num in enumerate(question_numbers[i:i+5]):
+                with cols[j]:
+                    choice = st.radio(
+                        f"**{q_num}번 ({q_weight_map[q_num]}점)**", 
+                        options=["O", "X"], 
+                        horizontal=True, 
+                        key=f"q_{q_num}"
+                    )
+                    # 맞춘 경우 매핑 테이블에 기록된 배점을 부여, 틀리면 0점
+                    answers[str(q_num)] = q_weight_map[q_num] if choice == "O" else 0
+
+        st.markdown("---")
+        
+        # --- 실시간 개수 및 점수 계산 로직 ---
+        total_score = sum(answers.values())
+        count_2pt = sum(1 for q, score in answers.items() if q_weight_map[q] == 2 and score > 0)
+        count_3pt = sum(1 for q, score in answers.items() if q_weight_map[q] == 3 and score > 0)
+        count_4pt = sum(1 for q, score in answers.items() if q_weight_map[q] == 4 and score > 0)
+        count_etc = sum(1 for q, score in answers.items() if q_weight_map[q] not in [2, 3, 4] and score > 0)
+
+        # --- 대시보드 시각적 구현 ---
+        st.markdown("### 📈 실시간 채점 결과 요약")
+        sc1, sc2, sc3, sc4, sc5 = st.columns(5)
+        
+        with sc1:
+            st.metric(label="💯 현재 총점", value=f"{total_score} 점")
+        with sc2:
+            st.metric(label="🟢 2점 맞은 개수", value=f"{count_2pt} 개")
+        with sc3:
+            st.metric(label="🔵 3점 맞은 개수", value=f"{count_3pt} 개")
+        with sc4:
+            st.metric(label="🔴 4점 맞은 개수", value=f"{count_4pt} 개")
+        with sc5:
+            if count_etc > 0:
+                st.metric(label="🟡 기타 배점 정답", value=f"{count_etc} 개")
+            else:
+                st.metric(label="📝 총 문항 수", value=f"{len(question_numbers)} 문항")
+
+        st.markdown("---")
+
+        if st.button("DB에 성적 저장하기", type="primary", use_container_width=True):
+            clean_name = input_name.strip()
+            if not clean_name: 
+                st.error("⚠ 이름을 입력해주세요.")
+            else:
+                try:
+                    new_record = {
+                        "시험명": selected_test,
+                        "이름": clean_name,
+                        "반": input_class,
+                        "학교": input_school,
+                        "학년": input_grade
+                    }
+                    # 기존 정오답 판별 체계(1:정답, 0:오답)의 안전한 DB 적재 보존
+                    for q_num in question_numbers:
+                        new_record[str(q_num)] = 1 if answers[str(q_num)] > 0 else 0
+
+                    supabase = init_supabase()
+                    supabase.table("student_results").insert(new_record).execute()
+                    
+                    st.success(f"🎉 {clean_name} 학생의 성적({total_score}점)이 DB에 안전하게 저장되었습니다!")
+                    st.cache_data.clear() 
+                    st.rerun()
+                except Exception as e: 
+                    st.error(f"저장 중 오류 발생: {e}")
 
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
@@ -522,7 +567,6 @@ with tab3:
     st.subheader(f"[{selected_test}] 반별 전체 심층 분석 일괄 출력")
     
     if '반' in df_results_all.columns:
-        # 💡 반별 탭에서도 최신 데이터를 기준으로 고르게 매칭하기 위해 전체 목록 가공
         all_classes = df_results_all['반'].astype(str).str.strip().unique().tolist()
         class_list = sorted([c for c in all_classes if c and c != '0' and c != 'nan'])
         
@@ -532,7 +576,7 @@ with tab3:
             students_in_class = df_results_all[
                 (df_results_all['시험명'] == selected_test) & 
                 (df_results_all['반'].astype(str).str.strip() == target_class)
-            ]['이름'].astype(str).str.strip().unique().tolist() # 중복 이름 제거하여 콤보박스 표기
+            ]['이름'].astype(str).str.strip().unique().tolist()
             
             students_in_class = sorted([s for s in students_in_class if s and s != '0' and s != 'nan'])
             
