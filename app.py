@@ -65,8 +65,8 @@ def fetch_all_dataframes():
             nums = re.findall(r'\d+', col_str)
             return nums[0] if nums else col_str
             
-        # 💡 메타 컬럼 리스트에 '분기' 추가
-        meta_cols = ['id', 'created_at', '시험명', '이름', '반', '학교', '학년', '분기']
+        # 💡 메타 컬럼 리스트에 '구분', '분기' 추가
+        meta_cols = ['id', 'created_at', '시험명', '이름', '반', '학교', '학년', '분기', '구분']
         new_columns = []
         for col in df_results.columns:
             if col in meta_cols:
@@ -92,7 +92,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     txt_jeet = fig.text(0.31, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
     txt_title = fig.text(0.33, 0.88, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
     
-    # 💡 리포트 상단에 분기 정보가 있다면 함께 표시되도록 커스텀
     student_class = str(s_row.get('반', '')).strip()
     student_quarter = str(s_row.get('분기', '')).strip()
     
@@ -465,7 +464,7 @@ df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 tab1, tab2, tab3 = st.tabs(["✍️ 성적 입력", "📊 개별 리포트 출력", "📚 반별 일괄 리포트 출력"])
 
 with tab1:
-    st.subheader(f"[{selected_test}] 신규 학생 성적 입력")
+    st.subheader(f"[{selected_test}] 학생 성적 입력")
     
     if not df_info_filtered.empty:
         q_weight_map = dict(zip(
@@ -478,14 +477,16 @@ with tab1:
         question_numbers = []
 
     if question_numbers:
-        # 💡 상단 입력 컴포넌트를 5열 구조로 늘려서 '분기 선택 상자' 배치
-        ci1, ci2, ci3, ci4, ci5 = st.columns(5)
-        with ci1: input_name = st.text_input("이름", key="input_name")
-        with ci2: input_class = st.text_input("반 (예: A반)", key="input_class")
-        with ci3: input_school = st.text_input("학교", key="input_school")
-        with ci4: input_grade = st.selectbox("학년", ["중1", "중2", "중3"], key="input_grade")
-        # 💡 신규 추가된 분기 입력란
-        with ci5: input_quarter = st.selectbox("분기", ["1분기", "2분기", "3분기", "4분기", "기타/정기"], key="input_quarter")
+        # 💡 상단 입력 컴포넌트를 6열 구조로 확장하여 맨 앞에 '구분' 추가
+        ci1, ci2, ci3, ci4, ci5, ci6 = st.columns([1.2, 1.5, 1.5, 1.5, 1.2, 1.2])
+        
+        # 💡 신규 생성된 '구분' 라디오 버튼 (재원생/신규생)
+        with ci1: input_type = st.radio("구분", ["재원생", "신규생"], key="input_type", horizontal=True)
+        with ci2: input_name = st.text_input("이름", key="input_name")
+        with ci3: input_class = st.text_input("반 (예: A반)", key="input_class")
+        with ci4: input_school = st.text_input("학교", key="input_school")
+        with ci5: input_grade = st.selectbox("학년", ["중1", "중2", "중3"], key="input_grade")
+        with ci6: input_quarter = st.selectbox("분기", ["1분기", "2분기", "3분기", "4분기", "기타/정기"], key="input_quarter")
         
         st.markdown("---")
         
@@ -535,9 +536,10 @@ with tab1:
                 st.error("⚠ 이름을 입력해주세요.")
             else:
                 try:
-                    # 💡 DB에 보낼 오브젝트 정보에 "분기": input_quarter 쌍 추가
+                    # 💡 DB 전송 구조에 "구분": input_type 쌍 반영
                     new_record = {
                         "시험명": selected_test,
+                        "구분": input_type,
                         "이름": clean_name,
                         "반": input_class,
                         "학교": input_school,
@@ -550,11 +552,11 @@ with tab1:
                     supabase = init_supabase()
                     supabase.table("student_results").insert(new_record).execute()
                     
-                    st.success(f"🎉 {clean_name} 학생의 [{input_quarter}] 성적({total_score}점)이 DB에 성공적으로 저장되었습니다!")
+                    st.success(f"🎉 [{input_type}] {clean_name} 학생의 [{input_quarter}] 성적({total_score}점)이 DB에 성공적으로 저장되었습니다!")
                     st.cache_data.clear() 
                     st.rerun()
                 except Exception as e: 
-                    st.error(f"저장 중 오류 발생: {e}\n(잠깐! Supabase DB에 '분기' 컬럼을 추가하셨나요?)")
+                    st.error(f"저장 중 오류 발생: {e}\n(잠깐! Supabase DB에 '구분' 컬럼을 추가하셨나요?)")
 
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
