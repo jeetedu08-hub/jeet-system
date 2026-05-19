@@ -65,7 +65,8 @@ def fetch_all_dataframes():
             nums = re.findall(r'\d+', col_str)
             return nums[0] if nums else col_str
             
-        meta_cols = ['id', 'created_at', '시험명', '이름', '반', '학교', '학년']
+        # 💡 메타 컬럼 리스트에 '분기' 추가
+        meta_cols = ['id', 'created_at', '시험명', '이름', '반', '학교', '학년', '분기']
         new_columns = []
         for col in df_results.columns:
             if col in meta_cols:
@@ -91,9 +92,14 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     txt_jeet = fig.text(0.31, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
     txt_title = fig.text(0.33, 0.88, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
     
+    # 💡 리포트 상단에 분기 정보가 있다면 함께 표시되도록 커스텀
     student_class = str(s_row.get('반', '')).strip()
-    class_text = f"{student_class}  |  " if student_class and student_class != '0' else ""
-    info_text = f"학교: {s_row.get('학교', '')}  |  학년: {student_grade}  |  {class_text}이름: {student_name}  |  과정: {selected_test}"
+    student_quarter = str(s_row.get('분기', '')).strip()
+    
+    class_text = f"{student_class}  |  " if student_class and student_class != '0' and student_class != '0.0' else ""
+    quarter_text = f" [{student_quarter}]" if student_quarter and student_quarter != '0' and student_quarter != '0.0' else ""
+    
+    info_text = f"학교: {s_row.get('학교', '')}  |  학년: {student_grade}  |  {class_text}이름: {student_name}  |  과정: {selected_test}{quarter_text}"
     txt_info = fig.text(0.5, 0.84, info_text, ha='center', fontsize=15, fontweight='bold', color='#222')
 
     txt_jeet.set_path_effects([path_effects.withStroke(linewidth=2, foreground=COLOR_RED)])
@@ -458,11 +464,9 @@ df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 
 tab1, tab2, tab3 = st.tabs(["✍️ 성적 입력", "📊 개별 리포트 출력", "📚 반별 일괄 리포트 출력"])
 
-# --- 💡 탭 1 수정 및 기능 추가 완료 단락 ---
 with tab1:
     st.subheader(f"[{selected_test}] 신규 학생 성적 입력")
     
-    # 시험 정보 꼬임 방지를 위한 문항번호별 배점 맵 세팅
     if not df_info_filtered.empty:
         q_weight_map = dict(zip(
             df_info_filtered['문항번호'].astype(str), 
@@ -474,12 +478,14 @@ with tab1:
         question_numbers = []
 
     if question_numbers:
-        # 실시간 계산 대시보드 렌더링을 위해 st.form 바깥에 필드 배치
-        ci1, ci2, ci3, ci4 = st.columns(4)
+        # 💡 상단 입력 컴포넌트를 5열 구조로 늘려서 '분기 선택 상자' 배치
+        ci1, ci2, ci3, ci4, ci5 = st.columns(5)
         with ci1: input_name = st.text_input("이름", key="input_name")
         with ci2: input_class = st.text_input("반 (예: A반)", key="input_class")
         with ci3: input_school = st.text_input("학교", key="input_school")
         with ci4: input_grade = st.selectbox("학년", ["중1", "중2", "중3"], key="input_grade")
+        # 💡 신규 추가된 분기 입력란
+        with ci5: input_quarter = st.selectbox("분기", ["1분기", "2분기", "3분기", "4분기", "기타/정기"], key="input_quarter")
         
         st.markdown("---")
         
@@ -494,19 +500,16 @@ with tab1:
                         horizontal=True, 
                         key=f"q_{q_num}"
                     )
-                    # 맞춘 경우 매핑 테이블에 기록된 배점을 부여, 틀리면 0점
                     answers[str(q_num)] = q_weight_map[q_num] if choice == "O" else 0
 
         st.markdown("---")
         
-        # --- 실시간 개수 및 점수 계산 로직 ---
         total_score = sum(answers.values())
         count_2pt = sum(1 for q, score in answers.items() if q_weight_map[q] == 2 and score > 0)
         count_3pt = sum(1 for q, score in answers.items() if q_weight_map[q] == 3 and score > 0)
         count_4pt = sum(1 for q, score in answers.items() if q_weight_map[q] == 4 and score > 0)
         count_etc = sum(1 for q, score in answers.items() if q_weight_map[q] not in [2, 3, 4] and score > 0)
 
-        # --- 대시보드 시각적 구현 ---
         st.markdown("### 📈 실시간 채점 결과 요약")
         sc1, sc2, sc3, sc4, sc5 = st.columns(5)
         
@@ -532,25 +535,26 @@ with tab1:
                 st.error("⚠ 이름을 입력해주세요.")
             else:
                 try:
+                    # 💡 DB에 보낼 오브젝트 정보에 "분기": input_quarter 쌍 추가
                     new_record = {
                         "시험명": selected_test,
                         "이름": clean_name,
                         "반": input_class,
                         "학교": input_school,
-                        "학년": input_grade
+                        "학년": input_grade,
+                        "분기": input_quarter
                     }
-                    # 기존 정오답 판별 체계(1:정답, 0:오답)의 안전한 DB 적재 보존
                     for q_num in question_numbers:
                         new_record[str(q_num)] = 1 if answers[str(q_num)] > 0 else 0
 
                     supabase = init_supabase()
                     supabase.table("student_results").insert(new_record).execute()
                     
-                    st.success(f"🎉 {clean_name} 학생의 성적({total_score}점)이 DB에 안전하게 저장되었습니다!")
+                    st.success(f"🎉 {clean_name} 학생의 [{input_quarter}] 성적({total_score}점)이 DB에 성공적으로 저장되었습니다!")
                     st.cache_data.clear() 
                     st.rerun()
                 except Exception as e: 
-                    st.error(f"저장 중 오류 발생: {e}")
+                    st.error(f"저장 중 오류 발생: {e}\n(잠깐! Supabase DB에 '분기' 컬럼을 추가하셨나요?)")
 
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
