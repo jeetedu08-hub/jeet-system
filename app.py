@@ -12,6 +12,7 @@ import io
 from supabase import create_client, Client
 import zipfile
 import re
+import time  # 💡 자동 새로고침 전 대기를 위해 time 모듈 추가
 
 # --- 1. 환경 및 폰트 설정 ---
 font_path = "malgun.ttf"
@@ -553,9 +554,15 @@ with tab1:
                     supabase = init_supabase()
                     supabase.table("student_results").insert(new_record).execute()
                     
-                    st.success(f"🎉 [{input_type}] {clean_name} 학생의 [{input_quarter}] 성적({total_score}점)이 DB에 성공적으로 저장되었습니다!")
                     st.cache_data.clear() 
+                    
+                    # 💡 [성공 피드백 로직 적용] 팝업창이 아니라 페이지 본문에 초록색 메시지 노출
+                    st.success(f"🎉 [{input_type}] {clean_name} 학생의 [{input_quarter}] 성적({total_score}점)이 DB에 성공적으로 저장되었습니다!")
+                    
+                    # 사용자가 인지할 수 있도록 2초간 딜레이 부여 후 새로고침 진행
+                    time.sleep(2.0)
                     st.rerun()
+                    
                 except Exception as e: 
                     st.error(f"저장 중 오류 발생: {e}\n(잠깐! Supabase DB에 '구분' 컬럼을 추가하셨나요?)")
 
