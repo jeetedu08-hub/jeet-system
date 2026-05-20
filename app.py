@@ -95,11 +95,12 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     student_class = str(s_row.get('반', '')).strip()
     student_quarter = str(s_row.get('분기', '')).strip()
     
-    class_text = f"{student_class}  |  " if student_class and student_class != '0' and student_class != '0.0' else ""
+    class_text = f"{student_class} | " if student_class and student_class != '0' and student_class != '0.0' else ""
     quarter_text = f" [{student_quarter}]" if student_quarter and student_quarter != '0' and student_quarter != '0.0' else ""
     
-    info_text = f"학교: {s_row.get('학교', '')}  |  학년: {student_grade}  |  {class_text}이름: {student_name}  |  과정: {selected_test}{quarter_text}"
-    txt_info = fig.text(0.5, 0.84, info_text, ha='center', fontsize=15, fontweight='bold', color='#222')
+    # 💡 [수정] 항목 간 여백을 미세하게 조절하고, 폰트 사이즈를 15에서 12로 변경하여 외곽선 밖으로 나가지 않도록 고정했습니다.
+    info_text = f"학교: {s_row.get('학교', '')} | 학년: {student_grade} | {class_text}이름: {student_name} | 과정: {selected_test}{quarter_text}"
+    txt_info = fig.text(0.5, 0.84, info_text, ha='center', fontsize=12, fontweight='bold', color='#222')
 
     txt_jeet.set_path_effects([path_effects.withStroke(linewidth=2, foreground=COLOR_RED)])
     txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
