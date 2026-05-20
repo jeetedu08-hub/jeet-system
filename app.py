@@ -176,7 +176,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     
     t_p1 = fig.text(0.11, 0.44, "▶ ", fontsize=13, fontweight='bold', color=COLOR_NAVY)
     t_p2 = fig.text(0.13, 0.44, " JEET", fontsize=13, fontweight='bold', color=COLOR_RED)
-    t_p3 = fig.text(0.185, 0.44, f" 중등 수학 교육원 {student_name} 학생 심층 분석", fontsize=13, fontweight='bold', color=COLOR_NAVY)
+    t_p3 = fig.text(0.185, 0.44, f" 중등 자사 센터 {student_name} 학생 심층 분석", fontsize=13, fontweight='bold', color=COLOR_NAVY)
     for t_obj in [t_p1, t_p2, t_p3]: t_obj.set_path_effects([path_effects.withStroke(linewidth=1, foreground=t_obj.get_color())])
     
     u_res = s_pct 
