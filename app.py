@@ -12,7 +12,7 @@ import io
 from supabase import create_client, Client
 import zipfile
 import re
-import time  # 💡 자동 새로고침 전 대기를 위해 time 모듈 추가
+import time 
 
 # --- 1. 환경 및 폰트 설정 ---
 font_path = "malgun.ttf"
@@ -66,7 +66,6 @@ def fetch_all_dataframes():
             nums = re.findall(r'\d+', col_str)
             return nums[0] if nums else col_str
             
-        # 💡 메타 컬럼 리스트에 '구분', '분기' 추가
         meta_cols = ['id', 'created_at', '시험명', '이름', '반', '학교', '학년', '분기', '구분']
         new_columns = []
         for col in df_results.columns:
@@ -99,7 +98,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     class_text = f"{student_class} | " if student_class and student_class != '0' and student_class != '0.0' else ""
     quarter_text = f" [{student_quarter}]" if student_quarter and student_quarter != '0' and student_quarter != '0.0' else ""
     
-    # 💡 [수정] 항목 간 여백을 미세하게 조절하고, 폰트 사이즈를 15에서 12로 변경하여 외곽선 밖으로 나가지 않도록 고정했습니다.
     info_text = f"학교: {s_row.get('학교', '')} | 학년: {student_grade} | {class_text}이름: {student_name} | 과정: {selected_test}{quarter_text}"
     txt_info = fig.text(0.5, 0.84, info_text, ha='center', fontsize=12, fontweight='bold', color='#222')
 
@@ -479,16 +477,21 @@ with tab1:
         question_numbers = []
 
     if question_numbers:
-        # 💡 상단 입력 컴포넌트를 6열 구조로 확장하여 맨 앞에 '구분' 추가
+        # 💡 [핵심 제어] 새로고침(리셋)용 고유 세션 스테이트 키를 생성합니다.
+        if "input_session_key" not in st.session_state:
+            st.session_state["input_session_key"] = 0
+            
+        # 이 변수를 모든 입력 요소의 고유 key에 결합하여 변경 시 강제 초기화합니다.
+        sk = st.session_state["input_session_key"]
+
         ci1, ci2, ci3, ci4, ci5, ci6 = st.columns([1.2, 1.5, 1.5, 1.5, 1.2, 1.2])
         
-        # 💡 신규 생성된 '구분' 라디오 버튼 (재원생/신규생)
-        with ci1: input_type = st.radio("구분", ["재원생", "신규생"], key="input_type", horizontal=True)
-        with ci2: input_name = st.text_input("이름", key="input_name")
-        with ci3: input_class = st.text_input("반 (예: A반)", key="input_class")
-        with ci4: input_school = st.text_input("학교", key="input_school")
-        with ci5: input_grade = st.selectbox("학년", ["중1", "중2", "중3"], key="input_grade")
-        with ci6: input_quarter = st.selectbox("분기", ["1분기", "2분기", "3분기", "4분기", "기타/정기"], key="input_quarter")
+        with ci1: input_type = st.radio("구분", ["재원생", "신규생"], key=f"input_type_{sk}", horizontal=True)
+        with ci2: input_name = st.text_input("이름", key=f"input_name_{sk}")
+        with ci3: input_class = st.text_input("반 (예: A반)", key=f"input_class_{sk}")
+        with ci4: input_school = st.text_input("학교", key=f"input_school_{sk}")
+        with ci5: input_grade = st.selectbox("학년", ["중1", "중2", "중3"], key=f"input_grade_{sk}")
+        with ci6: input_quarter = st.selectbox("분기", ["1분기", "2분기", "3분기", "4분기", "기타/정기"], key=f"input_quarter_{sk}")
         
         st.markdown("---")
         
@@ -501,7 +504,7 @@ with tab1:
                         f"**{q_num}번 ({q_weight_map[q_num]}점)**", 
                         options=["O", "X"], 
                         horizontal=True, 
-                        key=f"q_{q_num}"
+                        key=f"q_{q_num}_{sk}"  # 💡 O/X 라디오 버튼도 새로고침 시 초기화되도록 키 연동
                     )
                     answers[str(q_num)] = q_weight_map[q_num] if choice == "O" else 0
 
@@ -538,7 +541,6 @@ with tab1:
                 st.error("⚠ 이름을 입력해주세요.")
             else:
                 try:
-                    # 💡 DB 전송 구조에 "구분": input_type 쌍 반영
                     new_record = {
                         "시험명": selected_test,
                         "구분": input_type,
@@ -556,10 +558,12 @@ with tab1:
                     
                     st.cache_data.clear() 
                     
-                    # 💡 [성공 피드백 로직 적용] 팝업창이 아니라 페이지 본문에 초록색 메시지 노출
+                    # 페이지 본문에 성공 메시지 고정 노출
                     st.success(f"🎉 [{input_type}] {clean_name} 학생의 [{input_quarter}] 성적({total_score}점)이 DB에 성공적으로 저장되었습니다!")
                     
-                    # 사용자가 인지할 수 있도록 2초간 딜레이 부여 후 새로고침 진행
+                    # 💡 [핵심 변경] 저장 성공 후 세션 스테이트 넘버를 1 올림으로써 모든 입력창과 O/X 컴포넌트를 강제 백지 상태로 만듭니다.
+                    st.session_state["input_session_key"] += 1
+                    
                     time.sleep(2.0)
                     st.rerun()
                     
