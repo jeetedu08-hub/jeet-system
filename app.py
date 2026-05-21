@@ -81,7 +81,7 @@ def fetch_all_dataframes():
                 new_columns.append(normalize_col(col))
         df_results.columns = new_columns
 
-        # 🔥 [보정] 맞은 개수가 누락되었거나 0인 경우 실시간 자동 계산 로직
+        # 🔥 [보정] 맞은 개수 및 총점 누락 데이터 실시간 자동 보정/계산 로직
         if not df_info.empty:
             df_info['문항번호_정제'] = df_info['문항번호'].apply(normalize_col)
             weight_dict = {}
@@ -100,20 +100,28 @@ def fetch_all_dataframes():
                 
                 if test_weights:
                     c_2, c_3, c_4 = 0, 0, 0
+                    calculated_total = 0  # 실시간 계산할 총점 변수
+                    
                     for q_col, weight in test_weights.items():
                         if q_col in df_results.columns:
                             val = res_row[q_col]
                             if str(val).strip().upper() in ['1', '1.0', 'O', '정답', 'TRUE']:
+                                calculated_total += weight  # 정답인 경우 배점만큼 총점에 누적
                                 if weight == 2: c_2 += 1
                                 elif weight == 3: c_3 += 1
                                 elif weight == 4: c_4 += 1
                     
+                    # 맞은 개수 보정
                     if pd.isna(res_row.get('맞은개수_2점')) or res_row.get('맞은개수_2점') == 0:
                         df_results.at[idx, '맞은개수_2점'] = c_2
                     if pd.isna(res_row.get('맞은개수_3점')) or res_row.get('맞은개수_3점') == 0:
                         df_results.at[idx, '맞은개수_3점'] = c_3
                     if pd.isna(res_row.get('맞은개수_4점')) or res_row.get('맞은개수_4점') == 0:
                         df_results.at[idx, '맞은개수_4점'] = c_4
+                        
+                    # 🛠️ [추가] 총점 보정: 총점이 누락되었거나 0점인 경우 채점 기반 데이터로 자동 환산
+                    if pd.isna(res_row.get('총점')) or res_row.get('총점') == 0:
+                        df_results.at[idx, '총점'] = calculated_total
         
     return df_info, df_results
 
@@ -592,7 +600,7 @@ if not test_list:
 selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
 df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 
-# 상위 레이아웃에서 탭 선언 순서 동기화
+# 탭 선언
 tab1, tab2, tab3, tab4 = st.tabs(["✍️ 성적 입력", "📊 개별 리포트 출력", "📚 반별 일괄 리포트 출력", "🟢 분기별 엑셀 추출"])
 
 # --- Tab 1: 성적 입력 ---
@@ -798,7 +806,7 @@ with tab4:
             if '반' in filtered_df.columns:
                 filtered_df = filtered_df.sort_values(by=['반', '이름'] if '이름' in filtered_df.columns else ['반'])
                 
-            st.success(f"🎯 [{excel_quarter}]의 모든 시험 과정에서 총 {len(filtered_df)}명의 재원생 데이터가 통합 확인되었습니다. (누락된 맞은 개수도 백그라운드에서 자동 보정되었습니다.)")
+            st.success(f"🎯 [{excel_quarter}]의 모든 시험 과정에서 총 {len(filtered_df)}명의 재원생 데이터가 통합 확인되었습니다. (누락된 맞은 개수와 총점 모두 백그라운드에서 완벽히 보정되었습니다.)")
             
             with st.spinner("통합 엑셀 시트 스타일 마스터링 중..."):
                 excel_file = export_excel_styled(filtered_df, excel_quarter, actual_q_cols)
