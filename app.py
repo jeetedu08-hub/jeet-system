@@ -281,7 +281,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         fig.text([0.22, 0.50, 0.78][i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
 
 
-# --- 4. 데이터 가공 헬퍼 함수 ---
+# --- 4. 데이터 가공 헬퍼 함수 (에러 해결 수정본) ---
 def prepare_report_data(selected_test):
     df_info, df_results = fetch_all_dataframes()
     
@@ -302,6 +302,9 @@ def prepare_report_data(selected_test):
     q_cols = df_info['문항번호'].tolist()
     
     def safe_to_binary(val):
+        # 만약 val이 판다스 Series나 배열 형태로 비정상 호출되면 에러 방지 후 0 처리
+        if hasattr(val, 'any') or hasattr(val, 'all'):
+            return 0
         if pd.isna(val): 
             return 0
         v_str = str(val).strip().upper()
@@ -318,7 +321,13 @@ def prepare_report_data(selected_test):
         df_scores = pd.DataFrame(index=df_results.index, columns=q_cols)
         for q in q_cols:
             if q in df_results.columns:
-                df_scores[q] = df_results[q].apply(safe_to_binary)
+                # 💡 핵심 수정 포인트: 중복 컬럼 유무 확인
+                # df_results[q]가 중복으로 인해 DataFrame(2차원)일 경우 첫 번째 열만 가져옴
+                target_col = df_results[q]
+                if isinstance(target_col, pd.DataFrame):
+                    target_col = target_col.iloc[:, 0]
+                
+                df_scores[q] = target_col.apply(safe_to_binary)
             else:
                 df_scores[q] = 0 
     else:
@@ -353,6 +362,9 @@ def generate_jeet_expert_report(target_name, selected_test):
             student_answers = []
             for q in analysis['문항번호']:
                 val = s_row.get(str(q), None)
+                # 만약 행 데이터(s_row) 내부에도 컬럼 중복으로 인해 Series 데이터가 발견되면 첫 번째 값 추출
+                if isinstance(val, pd.Series):
+                    val = val.iloc[0]
                 student_answers.append(safe_to_binary(val) if val is not None else 0)
                 
             analysis['정답여부'] = student_answers
@@ -404,6 +416,8 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                 student_answers = []
                 for q in analysis['문항번호']:
                     val = s_row.get(str(q), None)
+                    if isinstance(val, pd.Series):
+                        val = val.iloc[0]
                     student_answers.append(safe_to_binary(val) if val is not None else 0)
                     
                 analysis['정답여부'] = student_answers
@@ -494,7 +508,6 @@ with tab1:
         st.markdown("---")
         
         answers = {}
-        # 💡 가로 한 줄에 4문제씩 딱 떨어지도록 슬라이싱 및 컬럼 배치 수정
         for i in range(0, len(question_numbers), 4):
             cols = st.columns(4)
             for j, q_num in enumerate(question_numbers[i:i+4]):
