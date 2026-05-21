@@ -494,14 +494,13 @@ def export_excel_styled(df, quarter_name, q_cols):
     
     # 스타일 정의
     navy_fill = PatternFill(start_color="1A237E", end_color="1A237E", fill_type="solid")
-    zebra_fill = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid") # 연한 회색
+    zebra_fill = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid")
     white_font = Font(name="Malgun Gothic", size=10, bold=True, color="FFFFFF")
     normal_font = Font(name="Malgun Gothic", size=10, bold=False, color="000000")
-    
     thin_border = Border(left=Side(style='thin', color='D3D3D3'), right=Side(style='thin', color='D3D3D3'), 
                          top=Side(style='thin', color='D3D3D3'), bottom=Side(style='thin', color='D3D3D3'))
     
-    # 1. 반별, 이름순 정렬
+    # 1. 정렬 로직: 반명 기준 오름차순, 이름 기준 오름차순
     df['반_정제'] = df['반'].astype(str).str.strip()
     df_sorted = df.sort_values(by=['반_정제', '이름'])
     
@@ -511,24 +510,22 @@ def export_excel_styled(df, quarter_name, q_cols):
     headers = base_headers + valid_q_cols
 
     # 2. 헤더 작성
-    for col_idx, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col_idx)
-        cell.value = header
+    for c_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=c_idx, value=header)
         cell.fill = navy_fill
         cell.font = white_font
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = thin_border
 
-    # 3. 데이터 작성 및 지브라 패턴 적용
+    # 3. 데이터 작성 (전체 행 지브라 패턴)
     for r_idx, (_, row) in enumerate(df_sorted.iterrows(), 2):
         for c_idx, header in enumerate(headers, 1):
-            cell = ws.cell(row=r_idx, column=c_idx)
-            cell.value = row.get(header, "")
+            cell = ws.cell(row=r_idx, column=c_idx, value=row.get(header, ""))
             cell.font = normal_font
             cell.border = thin_border
             cell.alignment = Alignment(horizontal="center", vertical="center")
             
-            # [핵심] 전체 행 지브라 패턴 (홀수 행마다 배경색)
+            # 홀수 행(헤더 제외 1, 3, 5...)에 지브라 패턴 적용
             if r_idx % 2 == 1:
                 cell.fill = zebra_fill
     
