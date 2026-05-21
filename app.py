@@ -492,14 +492,24 @@ with tab1:
             
         sk = st.session_state["input_session_key"]
 
-        ci1, ci2, ci3, ci4, ci5, ci6 = st.columns([1.2, 1.5, 1.5, 1.5, 1.2, 1.2])
+        ci1, ci2, ci3, ci4, ci5, ci6 = st.columns([1.2, 1.5, 1.5, 1.5, 1.2, 1.5])
         
         with ci1: input_type = st.radio("구분", ["재원생", "신규생"], key=f"input_type_{sk}", horizontal=True)
         with ci2: input_name = st.text_input("이름", key=f"input_name_{sk}")
         with ci3: input_class = st.text_input("반 (예: A반)", key=f"input_class_{sk}")
         with ci4: input_school = st.text_input("학교", key=f"input_school_{sk}")
         with ci5: input_grade = st.selectbox("학년", ["중1", "중2", "중3"], key=f"input_grade_{sk}")
-        with ci6: input_quarter = st.selectbox("분기", ["1분기", "2분기", "3분기", "4분기", "기타/정기"], key=f"input_quarter_{sk}")
+        
+        # 💡 핵심 수정 포인트: 분기 선택 리스트를 연도가 포함된 직관적인 형태로 수정
+        with ci6: input_quarter = st.selectbox(
+            "분기 선택", 
+            [
+                "2025년 4분기", 
+                "2026년 1분기", "2026년 2분기", "2026년 3분기", "2026년 4분기",
+                "2027년 1분기", "2027년 2분기", "기타/정기 평가"
+            ], 
+            key=f"input_quarter_{sk}"
+        )
         
         st.markdown("---")
         
@@ -549,7 +559,6 @@ with tab1:
                 st.error("⚠ 이름을 입력해주세요.")
             else:
                 try:
-                    # 💡 핵심 수정 포인트: new_record 딕셔너리에 총점 및 맞은 개수 컬럼 데이터 병합
                     new_record = {
                         "시험명": selected_test,
                         "구분": input_type,
@@ -578,7 +587,7 @@ with tab1:
                     st.rerun()
                     
                 except Exception as e: 
-                    st.error(f"저장 중 오류 발생: {e}\n(잠깐! Supabase DB에 '총점', '맞은개수_2점', '맞은개수_3점', '맞은개수_4점' 컬럼을 추가하셨나요?)")
+                    st.error(f"저장 중 오류 발생: {e}\n(잠깐! Supabase DB에 필요한 모든 컬럼이 생성되어 있는지 확인하세요.)")
 
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
