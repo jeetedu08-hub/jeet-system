@@ -14,6 +14,11 @@ import zipfile
 import re
 import time 
 
+# 엑셀 스타일링을 위한 라이브러리 추가
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
+
 # --- 1. 환경 및 폰트 설정 ---
 font_path = "malgun.ttf"
 try:
@@ -438,6 +443,93 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 
+# 💡 새로운 핵심 함수: openpyxl을 활용하여 깔끔하게 스타일링된 엑셀을 바이트 데이터로 빌드
+def export_excel_styled(df, quarter_name):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"재원생_성적데이터"
+    
+    # 엑셀 격자선 활성화 기본 세팅
+    ws.views.sheetView[0].showGridLines = True
+    
+    # 스타일 디자인 정의 (학원 브랜드 색상: Navy 무드 고수)
+    navy_fill = PatternFill(start_color="1A237E", end_color="1A237E", fill_type="solid")
+    zebra_fill = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid")
+    
+    white_font = Font(name="Malgun Gothic", size=10, bold=True, color="FFFFFF")
+    normal_font = Font(name="Malgun Gothic", size=10, bold=False, color="000000")
+    
+    thin_border_side = Side(border_style="thin", color="D3D3D3")
+    thin_border = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side)
+    
+    align_center = Alignment(horizontal="center", vertical="center")
+    align_right = Alignment(horizontal="right", vertical="center")
+    align_left = Alignment(horizontal="left", vertical="center")
+
+    # 1행: 타이틀 섹션 설정
+    ws.merge_cells("A1:G1")
+    ws["A1"] = f"JEET 수학학원 [{quarter_name}] 재원생 성적 통합 데이터"
+    ws["A1"].font = Font(name="Malgun Gothic", size=14, bold=True, color="1A237E")
+    ws["A1"].alignment = align_left
+    ws.row_dimensions[1].height = 30
+    
+    ws.append([]) # 2행: 한 줄 공백
+    
+    # 3행: 헤더 타이틀 작성
+    headers = list(df.columns)
+    ws.append(headers)
+    ws.row_dimensions[3].height = 26
+    
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=3, column=col_idx)
+        cell.fill = navy_fill
+        cell.font = white_font
+        cell.alignment = align_center
+        cell.border = thin_border
+        
+    # 4행~: 실제 성적 데이터 행별 채우기 및 로직 포맷팅
+    for r_idx, row_data in enumerate(df.values, 4):
+        ws.append(list(row_data))
+        ws.row_dimensions[r_idx].height = 20
+        
+        for c_idx in range(1, len(headers) + 1):
+            cell = ws.cell(row=r_idx, column=c_idx)
+            cell.font = normal_font
+            cell.border = thin_border
+            
+            # 홀수 행에 연한 회색 제브라 색감 추가하여 가독성 업그레이드
+            if r_idx % 2 == 1:
+                cell.fill = zebra_fill
+                
+            val = cell.value
+            col_header = headers[c_idx - 1]
+            
+            # 데이터 정렬 및 표시 형식 최적화
+            if isinstance(val, (int, float)):
+                if col_header in ["총점", "맞은개수_2점", "맞은개수_3점", "맞은개수_4점"]:
+                    cell.alignment = align_right
+                    cell.number_format = "#,##0"
+                else: # 문항 성적(0 또는 1)이거나 id 등 메타데이터 정렬
+                    cell.alignment = align_center
+            else:
+                cell.alignment = align_center
+                
+    # 각 열의 내용 길이에 맞춰 열 너비 자동 최적화
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.row == 1: continue # 타이틀 행은 길이 연산 제외
+            if cell.value:
+                max_len = max(max_len, len(str(cell.value)))
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 10)
+        
+    excel_buffer = io.BytesIO()
+    wb.save(excel_buffer)
+    excel_buffer.seek(0)
+    return excel_buffer
+
+
 # --- 5. Streamlit UI 구성 ---
 st.set_page_config(page_title="JEET 통합 관리 시스템", layout="wide", page_icon="📊")
 
@@ -471,7 +563,8 @@ if not test_list:
 selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
 df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 
-tab1, tab2, tab3 = st.tabs(["✍️ 성적 입력", "📊 개별 리포트 출력", "📚 반별 일괄 리포트 출력"])
+# 💡 분기별 엑셀 파일 출력 탭 추가
+tab1, tab2, tab3, tab4 = st.tabs(["✍️ 성적 입력", "📊 개별 리포트 출력", "📚 반별 일괄 리포트 출력", "🟢 분기별 엑셀 추출"])
 
 with tab1:
     st.subheader(f"[{selected_test}] 학생 성적 입력")
@@ -499,8 +592,6 @@ with tab1:
         with ci3: input_class = st.text_input("반 (예: A반)", key=f"input_class_{sk}")
         with ci4: input_school = st.text_input("학교", key=f"input_school_{sk}")
         with ci5: input_grade = st.selectbox("학년", ["중1", "중2", "중3"], key=f"input_grade_{sk}")
-        
-        # 💡 핵심 수정 포인트: 분기 선택 리스트를 연도가 포함된 직관적인 형태로 수정
         with ci6: input_quarter = st.selectbox(
             "분기 선택", 
             [
@@ -537,19 +628,13 @@ with tab1:
         st.markdown("### 📈 실시간 채점 결과 요약")
         sc1, sc2, sc3, sc4, sc5 = st.columns(5)
         
-        with sc1:
-            st.metric(label="💯 현재 총점", value=f"{total_score} 점")
-        with sc2:
-            st.metric(label="🟢 2점 맞은 개수", value=f"{count_2pt} 개")
-        with sc3:
-            st.metric(label="🔵 3점 맞은 개수", value=f"{count_3pt} 개")
-        with sc4:
-            st.metric(label="🔴 4점 맞은 개수", value=f"{count_4pt} 개")
+        with sc1: st.metric(label="💯 현재 총점", value=f"{total_score} 점")
+        with sc2: st.metric(label="🟢 2점 맞은 개수", value=f"{count_2pt} 개")
+        with sc3: st.metric(label="🔵 3점 맞은 개수", value=f"{count_3pt} 개")
+        with sc4: st.metric(label="🔴 4점 맞은 개수", value=f"{count_4pt} 개")
         with sc5:
-            if count_etc > 0:
-                st.metric(label="🟡 기타 배점 정답", value=f"{count_etc} 개")
-            else:
-                st.metric(label="📝 총 문항 수", value=f"{len(question_numbers)} 문항")
+            if count_etc > 0: st.metric(label="🟡 기타 배점 정답", value=f"{count_etc} 개")
+            else: st.metric(label="📝 총 문항 수", value=f"{len(question_numbers)} 문항")
 
         st.markdown("---")
 
@@ -579,7 +664,6 @@ with tab1:
                     supabase.table("student_results").insert(new_record).execute()
                     
                     st.cache_data.clear() 
-                    
                     st.success(f"🎉 [{input_type}] {clean_name} 학생의 [{input_quarter}] 성적({total_score}점)이 DB에 성공적으로 저장되었습니다!")
                     st.session_state["input_session_key"] += 1
                     
@@ -587,7 +671,7 @@ with tab1:
                     st.rerun()
                     
                 except Exception as e: 
-                    st.error(f"저장 중 오류 발생: {e}\n(잠깐! Supabase DB에 필요한 모든 컬럼이 생성되어 있는지 확인하세요.)")
+                    st.error(f"저장 중 오류 발생: {e}")
 
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
@@ -609,12 +693,10 @@ with tab3:
         
         if class_list:
             target_class = st.selectbox("📌 출력할 반을 선택하세요:", class_list)
-            
             students_in_class = df_results_all[
                 (df_results_all['시험명'] == selected_test) & 
                 (df_results_all['반'].astype(str).str.strip() == target_class)
             ]['이름'].astype(str).str.strip().unique().tolist()
-            
             students_in_class = sorted([s for s in students_in_class if s and s != '0' and s != 'nan'])
             
             if students_in_class:
@@ -636,15 +718,61 @@ with tab3:
         selected_students = None
 
     if st.button("반 전체/선택 일괄 생성 (ZIP)", type="primary"):
-        if not target_class.strip():
-            st.error("반 이름을 입력하거나 선택해주세요.")
-        elif selected_students is not None and len(selected_students) == 0:
-            st.error("출력할 학생을 최소 1명 이상 선택해주세요.")
+        if not target_class.strip(): st.error("반 이름을 입력하거나 선택해주세요.")
+        elif selected_students is not None and len(selected_students) == 0: st.error("출력할 학생을 최소 1명 이상 선택해주세요.")
         else:
             with st.spinner(f"리포트를 하나의 압축 파일로 모으는 중입니다. 잠시만 기다려주세요..."):
                 success, buf, msg = generate_batch_report(target_class, selected_test, selected_students)
                 if success:
                     st.success(msg)
                     st.download_button("📥 일괄 다운로드 (ZIP)", buf.getvalue(), f"{target_class}_리포트_모음.zip", "application/zip")
-                else: 
-                    st.error(msg)
+                else: st.error(msg)
+
+# 💡 새로운 핵심 UI 탭: 분기별 재원생 데이터 엑셀 필터링 및 다운로드 로직 구현
+with tab4:
+    st.subheader("📚 분기별 재원생 성적 데이터 엑셀 내보내기")
+    st.markdown("선택하신 **분기**와 현재 대시보드 상단의 **시험 과정**을 모두 만족하는 데이터 중, 구분이 **'재원생'**인 학생들의 명단만 추출해 엑셀로 빌드합니다.")
+    
+    if not df_results_all.empty and '분기' in df_results_all.columns:
+        quarter_options = sorted(df_results_all['분기'].dropna().astype(str).unique().tolist())
+    else:
+        quarter_options = ["2026년 1분기", "2026년 2분기", "2026년 3분기", "2026년 4분기"]
+        
+    excel_quarter = st.selectbox("📥 내보낼 분기를 선택하세요:", quarter_options, key="excel_quarter_select")
+    
+    if st.button("📊 해당 분기 재원생 엑셀 파일 생성하기", type="primary"):
+        # 1. 현재 선택된 시험명 + 선택된 분기 + 구분 == '재원생' 조건 필터링
+        filtered_df = df_results_all[
+            (df_results_all['시험명'] == selected_test) & 
+            (df_results_all['분기'].astype(str).str.strip() == excel_quarter.strip()) & 
+            (df_results_all['구분'].astype(str).str.strip() == '재원생')
+        ].copy()
+        
+        if filtered_df.empty:
+            st.warning(f"⚠ 현재 선택된 과정 [{selected_test}]의 [{excel_quarter}] 분기에는 '재원생' 데이터가 존재하지 않습니다. 먼저 성적 입력을 진행해주세요.")
+        else:
+            # 보기에 불편한 시스템 컬럼 정리 (id, created_at 제외)
+            cols_to_drop = [c for c in ['id', 'created_at'] if c in filtered_df.columns]
+            if cols_to_drop:
+                filtered_df = filtered_df.drop(columns=cols_to_drop)
+                
+            # 보기 좋게 기본 정렬 정돈 (반 -> 이름 순)
+            if '반' in filtered_df.columns:
+                filtered_df = filtered_df.sort_values(by=['반', '이름'] if '이름' in filtered_df.columns else ['반'])
+                
+            st.success(f"🎯 총 {len(filtered_df)}명의 재원생 성적 데이터가 확인되었습니다. 아래 버튼을 눌러 정돈된 엑셀 파일을 다운로드하세요.")
+            
+            # 스타일링된 엑셀 바이너리 생성
+            with st.spinner("엑셀 시트 스타일 마스터링 중..."):
+                excel_file = export_excel_styled(filtered_df, excel_quarter)
+                
+            # 파일명 특수문자 공백 치환 안전화
+            safe_filename = f"JEET_{selected_test}_{excel_quarter}_재원생성적.xlsx".replace(" ", "_")
+            
+            st.download_button(
+                label="📥 깔끔한 엑셀 파일(.xlsx) 다운로드",
+                data=excel_file.getvalue(),
+                file_name=safe_filename,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
