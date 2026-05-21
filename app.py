@@ -13,10 +13,6 @@ from supabase import create_client, Client
 import zipfile
 import re
 import time 
-# 엑셀 스타일링을 위한 라이브러리
-import openpyxl
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from openpyxl.utils import get_column_letter
 
 # --- 1. 환경 및 폰트 설정 ---
 font_path = "malgun.ttf"
@@ -33,7 +29,6 @@ except Exception as e:
 
 plt.rcParams['axes.unicode_minus'] = False
 
-# JEET 테마 컬러 바인딩
 COLOR_NAVY = '#1A237E'
 COLOR_RED = '#D32F2F'
 COLOR_STUDENT = '#0056B3' 
@@ -71,7 +66,7 @@ def fetch_all_dataframes():
             nums = re.findall(r'\d+', col_str)
             return nums[0] if nums else col_str
             
-        meta_cols = ['id', 'created_at', '시험명', '이름', '반', '학교', '학년', '분기', '구분', '총점']
+        meta_cols = ['id', 'created_at', '시험명', '이름', '반', '학교', '학년', '분기', '구분']
         new_columns = []
         for col in df_results.columns:
             if col in meta_cols:
@@ -218,29 +213,55 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     if g_good: diag_combined += f"{', '.join([f'<{u}>' for u in g_good])} 단원은 필수 유형들은 막힘없이 해결하고 있습니다. 이제는 단편적인 문제 풀이에서 벗어나, 개념을 다각도로 비트는 응용 문항에 대한 적응력을 키워야 할 때입니다. 심화 문항 도전 횟수를 늘려 사고의 유연성을 기른다면 보다 높은 수학 실력을 갖출 수 있을 것으로 판단됩니다. "
     if g_weak: diag_combined += f"{', '.join([f'<{u}>' for u in g_weak])} 단원은 개념의 조각들은 인지하고 있으나 실전 적용에서 병목 현상이 관찰됩니다. 난이도 높은 문제를 해결하기보다 핵심 유형의 반복 숙달이 필요하고, 성공적인 문제 풀이 경험을 축적하여 해당 단원의 수학적 자신감을 높인다면 한단계 더 발전할 수 있을 것으로 판단됩니다. "
     if g_warn: diag_combined += f"{', '.join([f'<{u}>' for u in g_warn])} 단원은 현재는 잠재력이 발현되기 전의 응축 단계입니다. 수학적 기초 체력이 부족할 뿐, 적절한 자극과 맞춤형 관리가 병행된다면 충분히 반등할 수 있는 가능성을 가지고 있습니다. 아이가 포기하지 않도록 가정에서 따뜻한 격려 부탁드립니다. "
+    if not (g_best or g_good or g_weak or g_warn):
+        diag_combined += "전반적인 단원별 성취도가 매우 균형 있게 나타나고 있습니다. 어느 한 쪽으로 치우치지 않는 고른 학습 균형이 큰 강점입니다."
 
     weak_list = u_res[u_res < 40].index.tolist()
     avg_score = u_res.mean()
+
     units_text = ', '.join([f'<{u}>' for u in weak_list]) if weak_list else "핵심"
 
     if avg_score >= 80:
-        sol_text = f"{student_name} 학생은 이미 훌륭한 학습 태도와 깊이 있는 이해력을 바탕으로 뛰어난 성취를 보여주고 있습니다. 지금의 우수함에 안주하지 않고 한 단계 더 도약할 수 있도록, JEET CARE+를 통해 고난도 사고력 문제를 즐길 수 있는 환경을 만들겠습니다. JDM을 활용하여 자기주도학습의 습관을 만들고, 커리큘럼과 연계된 주말몰입수업으로 심화를 다지면서 더 큰 성장을 향해 나아가겠습니다."
+        sol_text = (
+            f"{student_name} 학생은 이미 훌륭한 학습 태도와 깊이 있는 이해력을 바탕으로 뛰어난 성취를 보여주고 있습니다. 지금의 우수함에 안주하지 않고 한 단계 더 도약할 수 있도록, JEET CARE+를 통해 고난도 사고력 문제를 즐길 수 있는 환경을 만들겠습니다. JDM을 활용하여 자기주도학습의 습관을 만들고, 커리큘럼과 연계된 주말몰입수업으로 심화를 다지면서 더 큰 성장을 향해 나아가겠습니다."
+        )
     elif avg_score >= 50:
-        sol_text = f"배운 내용을 자기 것으로 만드는 과정이 순조로우며, 다음 단계를 향해 꾸준한 성장을 이어가고 있습니다. JEET CARE+를 통해 응용, 심화 문제를 연습하고, JDM을 활용하여 자기주도학습의 습관을 기르도록 지도하겠습니다. 또한 커리큘럼과 연계된 주말몰입수업으로, 한층 더 성취도를 끌어올리겠습니다."
+        sol_text = (
+            f"배운 내용을 자기 것으로 만드는 과정이 순조로우며, 다음 단계를 향해 꾸준한 성장을 이어가고 있습니다. JEET CARE+를 통해 응용, 심화 문제를 연습하고, JDM을 활용하여 자기주도학습의 습관을 기르도록 지도하겠습니다. 또한 커리큘럼과 연계된 주말몰입수업으로, 한층 더 성취도를 끌어올리겠습니다."
+        )
     elif avg_score >= 20:
-        sol_text = f"지금은 {student_name} 학생이 한 단계 더 성장하기 위해 에너지를 단단하게 모으는 시기입니다. {units_text} 단원처럼 조금은 낯설게 느껴졌던 부분들을 JEET CARE+ 밀착 관리를 통해 친숙한 개념으로 바꿔 가겠습니다. JDM을 활용하여 자기주도학습의 습관을 만들고, 커리큘럼에 연계된 주말몰입수업을 진행하며 수학이 즐거운 과목이 되도록 곁에서 든든하게 격려하며 지도하겠습니다."
+        sol_text = (
+            f"지금은 {student_name} 학생이 한 단계 더 성장하기 위해 에너지를 단단하게 모으는 시기입니다. {units_text} 단원처럼 조금은 낯설게 느껴졌던 부분들을 JEET CARE+ 밀착 관리를 통해 친숙한 개념으로 바꿔 가겠습니다. JDM을 활용하여 자기주도학습의 습관을 만들고, 커리큘럼에 연계된 주말몰입수업을 진행하며 수학이 즐거운 과목이 되도록 곁에서 든든하게 격려하며 지도하겠습니다."
+        )
     else:
-        sol_text = f"조금은 느리더라도 기초를 단단히 다지고 가는 것이 결국 가장 확실한 성장의 길임을 믿습니다. {student_name} 학생이 {units_text} 단원의 기초를 편안하게 받아들일 수 있도록, JEET CARE+와 JDM을 활용하여 기초를 다지며 자기주도학습의 습관을 만들고, 커리큘럼에 연계된 주말몰입수업을 진행하며 눈높이 지도를 진행하겠습니다. JEET만의 밀착관리 시스템을 통해 작은 노력들이 모여 큰 성취가 되는 기쁨을 체험하도록 정성을 다해 이끌겠습니다."
+        sol_text = (
+            f"조금은 느리더라도 기초를 단단히 다지고 가는 것이 결국 가장 확실한 성장의 길임을 믿습니다. {student_name} 학생이 {units_text} 단원의 기초를 편안하게 받아들일 수 있도록, JEET CARE+와 JDM을 활용하여 기초를 다지며 자기주도학습의 습관을 만들고, 커리큘럼에 연계된 주말몰입수업을 진행하며 눈높이 지도를 진행하겠습니다. JEET만의 밀착관리 시스템을 통해 작은 노력들이 모여 큰 성취가 되는 기쁨을 체험하도록 정성을 다해 이끌겠습니다."
+        )
 
     sections = [("[종합 진단]", diag_total), ("[영역별&단원별 분석]", diag_combined), ("[JEET 맞춤 솔루션]", sol_text)]
     total_chars = sum(len(content) for _, content in sections)
 
     if total_chars > 800:
-        wrap_width = 82; main_fs = 6.8; sub_fs = 8.5; y_offset = 0.012; section_gap = 0.025; line_height = 0.014    
+        wrap_width = 82        
+        main_fs = 6.8          
+        sub_fs = 8.5            
+        y_offset = 0.012       
+        section_gap = 0.025    
+        line_height = 0.014    
     elif total_chars > 600:
-        wrap_width = 74; main_fs = 7.5; sub_fs = 9.0; y_offset = 0.014; section_gap = 0.030; line_height = 0.016
+        wrap_width = 74
+        main_fs = 7.5
+        sub_fs = 9.0
+        y_offset = 0.014
+        section_gap = 0.030
+        line_height = 0.016
     else:
-        wrap_width = 65; main_fs = 8.2; sub_fs = 9.5; y_offset = 0.015; section_gap = 0.035; line_height = 0.018
+        wrap_width = 65
+        main_fs = 8.2
+        sub_fs = 9.5
+        y_offset = 0.015
+        section_gap = 0.035
+        line_height = 0.018
 
     curr_y = 0.415 
     for subtitle, content in sections:
@@ -281,12 +302,17 @@ def prepare_report_data(selected_test):
     q_cols = df_info['문항번호'].tolist()
     
     def safe_to_binary(val):
-        if pd.isna(val): return 0
+        if pd.isna(val): 
+            return 0
         v_str = str(val).strip().upper()
-        if v_str in ['O', '1', '1.0', '정답', 'TRUE']: return 1
-        if v_str in ['X', '0', '0.0', '오답', 'FALSE', '']: return 0
-        try: return 1 if float(val) > 0 else 0
-        except: return 0
+        if v_str in ['O', '1', '1.0', '정답', 'TRUE']: 
+            return 1
+        if v_str in ['X', '0', '0.0', '오답', 'FALSE', '']: 
+            return 0
+        try:
+            return 1 if float(val) > 0 else 0
+        except:
+            return 0
 
     if not df_results.empty:
         df_scores = pd.DataFrame(index=df_results.index, columns=q_cols)
@@ -333,6 +359,7 @@ def generate_jeet_expert_report(target_name, selected_test):
             analysis['득점'] = analysis['정답여부'] * analysis['배점']
             
             cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
+            
             unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
             unit_data = unit_data.reindex(unit_order).fillna(0)
 
@@ -344,6 +371,7 @@ def generate_jeet_expert_report(target_name, selected_test):
             break
             
         if not student_found: return False, None, "학생을 찾을 수 없습니다."
+        
         img_buffer.seek(0)
         return True, img_buffer, "리포트 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
@@ -360,15 +388,18 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
             cleaned_selected = [str(s).strip() for s in selected_students]
             class_students = class_students[class_students['이름'].astype(str).str.strip().isin(cleaned_selected)]
         
-        if class_students.empty: return False, None, f"선택된 학생 데이터가 없습니다."
+        if class_students.empty:
+            return False, None, f"선택된 학생 데이터가 없습니다. (이름 공백/오타 확인 필요)"
             
         zip_buffer = io.BytesIO()
+        
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
             for _, s_row in class_students.iterrows():
                 student_name = str(s_row.get('이름', '')).strip()
                 if not student_name or student_name == '0': continue
                     
                 student_grade = s_row.get('학년', '')
+                
                 analysis = df_info.copy()
                 student_answers = []
                 for q in analysis['문항번호']:
@@ -430,22 +461,29 @@ if not test_list:
 selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
 df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 
-# 4개의 탭 생성
-tab1, tab2, tab3, tab4 = st.tabs(["✍️ 성적 입력", "📊 개별 리포트 출력", "📚 반별 일괄 리포트 출력", "📥 재원생 성적 다운로드"])
+tab1, tab2, tab3 = st.tabs(["✍️ 성적 입력", "📊 개별 리포트 출력", "📚 반별 일괄 리포트 출력"])
 
 with tab1:
     st.subheader(f"[{selected_test}] 학생 성적 입력")
+    
     if not df_info_filtered.empty:
-        q_weight_map = dict(zip(df_info_filtered['문항번호'].astype(str), df_info_filtered['배점'].astype(int)))
+        q_weight_map = dict(zip(
+            df_info_filtered['문항번호'].astype(str), 
+            df_info_filtered['배점'].astype(int)
+        ))
         question_numbers = sorted(list(q_weight_map.keys()), key=lambda x: int(re.findall(r'\d+', x)[0]) if re.findall(r'\d+', x) else x)
     else:
-        q_weight_map = {}; question_numbers = []
+        q_weight_map = {}
+        question_numbers = []
 
     if question_numbers:
-        if "input_session_key" not in st.session_state: st.session_state["input_session_key"] = 0
+        if "input_session_key" not in st.session_state:
+            st.session_state["input_session_key"] = 0
+            
         sk = st.session_state["input_session_key"]
 
         ci1, ci2, ci3, ci4, ci5, ci6 = st.columns([1.2, 1.5, 1.5, 1.5, 1.2, 1.2])
+        
         with ci1: input_type = st.radio("구분", ["재원생", "신규생"], key=f"input_type_{sk}", horizontal=True)
         with ci2: input_name = st.text_input("이름", key=f"input_name_{sk}")
         with ci3: input_class = st.text_input("반 (예: A반)", key=f"input_class_{sk}")
@@ -454,15 +492,23 @@ with tab1:
         with ci6: input_quarter = st.selectbox("분기", ["1분기", "2분기", "3분기", "4분기", "기타/정기"], key=f"input_quarter_{sk}")
         
         st.markdown("---")
+        
         answers = {}
+        # 💡 가로 한 줄에 4문제씩 딱 떨어지도록 슬라이싱 및 컬럼 배치 수정
         for i in range(0, len(question_numbers), 4):
             cols = st.columns(4)
             for j, q_num in enumerate(question_numbers[i:i+4]):
                 with cols[j]:
-                    choice = st.radio(f"**{q_num}번 ({q_weight_map[q_num]}점)**", options=["O", "X"], horizontal=True, key=f"q_{q_num}_{sk}")
+                    choice = st.radio(
+                        f"**{q_num}번 ({q_weight_map[q_num]}점)**", 
+                        options=["O", "X"], 
+                        horizontal=True, 
+                        key=f"q_{q_num}_{sk}"
+                    )
                     answers[str(q_num)] = q_weight_map[q_num] if choice == "O" else 0
 
         st.markdown("---")
+        
         total_score = sum(answers.values())
         count_2pt = sum(1 for q, score in answers.items() if q_weight_map[q] == 2 and score > 0)
         count_3pt = sum(1 for q, score in answers.items() if q_weight_map[q] == 3 and score > 0)
@@ -471,36 +517,54 @@ with tab1:
 
         st.markdown("### 📈 실시간 채점 결과 요약")
         sc1, sc2, sc3, sc4, sc5 = st.columns(5)
-        with sc1: st.metric(label="💯 현재 총점", value=f"{total_score} 점")
-        with sc2: st.metric(label="🟢 2점 맞은 개수", value=f"{count_2pt} 개")
-        with sc3: st.metric(label="🔵 3점 맞은 개수", value=f"{count_3pt} 개")
-        with sc4: st.metric(label="🔴 4점 맞은 개수", value=f"{count_4pt} 개")
+        
+        with sc1:
+            st.metric(label="💯 현재 총점", value=f"{total_score} 점")
+        with sc2:
+            st.metric(label="🟢 2점 맞은 개수", value=f"{count_2pt} 개")
+        with sc3:
+            st.metric(label="🔵 3점 맞은 개수", value=f"{count_3pt} 개")
+        with sc4:
+            st.metric(label="🔴 4점 맞은 개수", value=f"{count_4pt} 개")
         with sc5:
-            if count_etc > 0: st.metric(label="🟡 기타 배점 정답", value=f"{count_etc} 개")
-            else: st.metric(label="📝 총 문항 수", value=f"{len(question_numbers)} 문항")
+            if count_etc > 0:
+                st.metric(label="🟡 기타 배점 정답", value=f"{count_etc} 개")
+            else:
+                st.metric(label="📝 총 문항 수", value=f"{len(question_numbers)} 문항")
 
         st.markdown("---")
+
         if st.button("DB에 성적 저장하기", type="primary", use_container_width=True):
             clean_name = input_name.strip()
-            if not clean_name: st.error("⚠ 이름을 입력해주세요.")
+            if not clean_name: 
+                st.error("⚠ 이름을 입력해주세요.")
             else:
                 try:
                     new_record = {
-                        "시험명": selected_test, "구분": input_type, "이름": clean_name,
-                        "반": input_class, "학교": input_school, "학년": input_grade,
-                        "분기": input_quarter, "총점": total_score 
+                        "시험명": selected_test,
+                        "구분": input_type,
+                        "이름": clean_name,
+                        "반": input_class,
+                        "학교": input_school,
+                        "학년": input_grade,
+                        "분기": input_quarter
                     }
                     for q_num in question_numbers:
                         new_record[str(q_num)] = 1 if answers[str(q_num)] > 0 else 0
 
                     supabase = init_supabase()
                     supabase.table("student_results").insert(new_record).execute()
+                    
                     st.cache_data.clear() 
-                    st.success(f"🎉 성적이 성공적으로 저장되었습니다!")
+                    
+                    st.success(f"🎉 [{input_type}] {clean_name} 학생의 [{input_quarter}] 성적({total_score}점)이 DB에 성공적으로 저장되었습니다!")
                     st.session_state["input_session_key"] += 1
-                    time.sleep(1.5)
+                    
+                    time.sleep(2.0)
                     st.rerun()
-                except Exception as e: st.error(f"저장 중 오류 발생: {e}")
+                    
+                except Exception as e: 
+                    st.error(f"저장 중 오류 발생: {e}\n(잠깐! Supabase DB에 '구분' 컬럼을 추가하셨나요?)")
 
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
@@ -515,176 +579,49 @@ with tab2:
 
 with tab3:
     st.subheader(f"[{selected_test}] 반별 전체 심층 분석 일괄 출력")
+    
     if '반' in df_results_all.columns:
         all_classes = df_results_all['반'].astype(str).str.strip().unique().tolist()
         class_list = sorted([c for c in all_classes if c and c != '0' and c != 'nan'])
+        
         if class_list:
             target_class = st.selectbox("📌 출력할 반을 선택하세요:", class_list)
-            students_in_class = df_results_all[(df_results_all['시험명'] == selected_test) & (df_results_all['반'].astype(str).str.strip() == target_class)]['이름'].astype(str).str.strip().unique().tolist()
+            
+            students_in_class = df_results_all[
+                (df_results_all['시험명'] == selected_test) & 
+                (df_results_all['반'].astype(str).str.strip() == target_class)
+            ]['이름'].astype(str).str.strip().unique().tolist()
+            
             students_in_class = sorted([s for s in students_in_class if s and s != '0' and s != 'nan'])
+            
             if students_in_class:
-                selected_students = st.multiselect("👇 출력할 학생을 선택하세요:", options=students_in_class, default=students_in_class)
+                selected_students = st.multiselect(
+                    "👇 출력할 학생을 선택하세요 (제외할 학생의 'X'를 누르세요):", 
+                    options=students_in_class, 
+                    default=students_in_class
+                )
             else:
-                st.warning(f"⚠ 선택하신 과정에 이 반의 학생 데이터가 없습니다."); selected_students = []
+                st.warning(f"⚠ 현재 선택하신 '{selected_test}' 과정에 '{target_class}' 학생 데이터가 없습니다.")
+                selected_students = []
         else:
-            target_class = st.text_input("출력할 반 이름 직접 입력:"); selected_students = None
+            st.info("DB에 아직 입력된 '반' 데이터가 없습니다.")
+            target_class = st.text_input("출력할 반 이름 직접 입력:", placeholder="예: S반")
+            selected_students = None
     else:
-        target_class = st.text_input("출력할 반 이름 직접 입력:"); selected_students = None
+        st.warning("⚠ DB에 '반' 컬럼이 없어 수동으로 입력해야 합니다.")
+        target_class = st.text_input("출력할 반 이름 직접 입력:", placeholder="예: S반")
+        selected_students = None
 
     if st.button("반 전체/선택 일괄 생성 (ZIP)", type="primary"):
-        if not target_class.strip(): st.error("반 이름을 입력하거나 선택해주세요.")
-        elif selected_students is not None and len(selected_students) == 0: st.error("출력할 학생을 최소 1명 이상 선택해주세요.")
+        if not target_class.strip():
+            st.error("반 이름을 입력하거나 선택해주세요.")
+        elif selected_students is not None and len(selected_students) == 0:
+            st.error("출력할 학생을 최소 1명 이상 선택해주세요.")
         else:
-            with st.spinner(f"리포트를 압축 파일로 모으는 중입니다..."):
+            with st.spinner(f"리포트를 하나의 압축 파일로 모으는 중입니다. 잠시만 기다려주세요..."):
                 success, buf, msg = generate_batch_report(target_class, selected_test, selected_students)
                 if success:
                     st.success(msg)
                     st.download_button("📥 일괄 다운로드 (ZIP)", buf.getvalue(), f"{target_class}_리포트_모음.zip", "application/zip")
-                else: st.error(msg)
-
-# --- 📥 4번째 탭: 배점별 정답 개수 실시간 연산 및 엑셀 다운로드 (버그 해결 완료) ---
-with tab4:
-    st.subheader("📥 분기별 재원생 성적 데이터 엑셀 다운로드")
-    st.markdown("선택한 **시험 과정** 및 **분기**에 해당되는 **재원생**들의 지표(2,3,4점 맞은 개수, 총점)를 정렬하여 다운로드합니다.")
-    
-    if not df_results_all.empty:
-        df_test_res = df_results_all[df_results_all['시험명'] == selected_test]
-        all_quarters = df_test_res['분기'].astype(str).str.strip().unique().tolist()
-        quarter_list = sorted([q for q in all_quarters if q and q != '0' and q != 'nan'])
-        
-        if quarter_list:
-            sel_quarter = st.selectbox("📥 다운로드할 분기를 선택하세요:", quarter_list, key="excel_quarter_select")
-            
-            # 1. 대상 데이터 필터링 (선택 시험, 선택 분기, 재원생)
-            df_filtered_excel = df_test_res[
-                (df_test_res['분기'].astype(str).str.strip() == sel_quarter) & 
-                (df_test_res['구분'].astype(str).str.strip() == '재원생')
-            ].copy()
-            
-            # 문항 매핑 정보 로드
-            if not df_info_filtered.empty:
-                excel_q_weight_map = dict(zip(df_info_filtered['문항번호'].astype(str), df_info_filtered['배점'].astype(int)))
-                excel_question_numbers = sorted(list(excel_q_weight_map.keys()), key=lambda x: int(re.findall(r'\d+', x)[0]) if re.findall(r'\d+', x) else x)
-            else:
-                excel_q_weight_map = {}; excel_question_numbers = []
-            
-            if not df_filtered_excel.empty and excel_question_numbers:
-                
-                # 2. 💡 과거/기존 입력 데이터 전체를 관통하는 2점, 3점, 4점 맞은 개수 실시간 연산
-                count_2pt_list, count_3pt_list, count_4pt_list = [], [], []
-                
-                for idx, row in df_filtered_excel.iterrows():
-                    c2, c3, c4 = 0, 0, 0
-                    for q in excel_question_numbers:
-                        val = row.get(q, 0)
-                        # '1', 'O', '정답' 등 다양한 데이터 포맷 예외처리 통합
-                        is_correct = 1 if str(val).strip().split('.')[0] in ['1', 'O', '정답', 'TRUE'] else 0
-                        
-                        if is_correct == 1:
-                            weight = excel_q_weight_map.get(q, 0)
-                            if weight == 2: c2 += 1
-                            elif weight == 3: c3 += 1
-                            elif weight == 4: c4 += 1
-                    
-                    count_2pt_list.append(c2)
-                    count_3pt_list.append(c3)
-                    count_4pt_list.append(c4)
-                
-                df_filtered_excel['2점 맞은 개수'] = count_2pt_list
-                df_filtered_excel['3점 맞은 개수'] = count_3pt_list
-                df_filtered_excel['4점 맞은 개수'] = count_4pt_list
-                
-                # 🔥 [ValueError 해결책 1] 기존 DB의 총점 컬럼과의 이름 중복 충돌을 막기 위해 제거 후 재연산
-                if '총점' in df_filtered_excel.columns:
-                    df_filtered_excel = df_filtered_excel.drop(columns=['총점'])
-                
-                df_filtered_excel['총점'] = df_filtered_excel.apply(
-                    lambda r: sum(excel_q_weight_map.get(q, 0) for q in excel_question_numbers if str(r.get(q, 0)).strip().split('.')[0] in ['1', 'O', '정답']), axis=1
-                )
-                
-                # 🔥 [ValueError 해결책 2] 그 외 다른 원인으로 컬럼명이 겹칠 상황을 완벽 제거
-                df_filtered_excel = df_filtered_excel.loc[:, ~df_filtered_excel.columns.duplicated()]
-                
-                # 3. 💡 요청받은 완벽한 컬럼 정렬 배치 순서 정의
-                base_meta_cols = ['시험명', '구분', '이름', '반', '학교', '학년', '분기']
-                requested_summary_cols = ['2점 맞은 개수', '3점 맞은 개수', '4점 맞은 개수', '총점']
-                
-                final_col_order = base_meta_cols + requested_summary_cols + excel_question_numbers
-                
-                # 안전하게 구조화 재정렬 수행
-                df_filtered_excel = df_filtered_excel.reindex(columns=final_col_order)
-                
-                st.markdown(f"**📊 필터링된 재원생 수:** `{len(df_filtered_excel)}명`")
-                st.dataframe(df_filtered_excel, use_container_width=True)
-                
-                # 4. openpyxl 프리미엄 스타일 입히기 및 엑셀 파일화
-                excel_buffer = io.BytesIO()
-                wb = openpyxl.Workbook()
-                ws = wb.active
-                ws.title = "재원생성적"
-                
-                font_name = "Malgun Gothic"
-                header_fill = PatternFill(start_color="1A237E", end_color="1A237E", fill_type="solid") # JEET Navy
-                summary_fill = PatternFill(start_color="F1F3F9", end_color="F1F3F9", fill_type="solid") # 연한 포인트 배경
-                
-                font_header = Font(name=font_name, size=11, bold=True, color="FFFFFF")
-                font_data = Font(name=font_name, size=10)
-                font_summary = Font(name=font_name, size=10, bold=True, color="1A237E")
-                
-                thin_side = Side(border_style="thin", color="E0E0E0")
-                grid_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
-                
-                # 헤더 세팅
-                ws.append(final_col_order)
-                for col_idx in range(1, len(final_col_order) + 1):
-                    cell = ws.cell(row=1, column=col_idx)
-                    cell.fill = header_fill
-                    cell.font = font_header
-                    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                
-                # 본문 세팅
-                for idx, row in df_filtered_excel.iterrows():
-                    row_values = [row[c] for c in final_col_order]
-                    ws.append(row_values)
-                    
-                    curr_row_idx = ws.max_row
-                    for col_idx, col_name in enumerate(final_col_order, start=1):
-                        data_cell = ws.cell(row=curr_row_idx, column=col_idx)
-                        data_cell.font = font_data
-                        data_cell.border = grid_border
-                        
-                        # 텍스트 vs 지표 정렬 규칙 분기
-                        if col_name in ['시험명', '이름', '반', '학교']:
-                            data_cell.alignment = Alignment(horizontal="left", vertical="center")
-                        else:
-                            data_cell.alignment = Alignment(horizontal="center", vertical="center")
-                        
-                        # 맞은 개수 요약존 음영 강조
-                        if col_name in requested_summary_cols:
-                            data_cell.fill = summary_fill
-                            data_cell.font = font_summary
-                
-                # 자동으로 열 너비 최적화 피팅
-                for col in ws.columns:
-                    max_len = max(len(str(cell.value or '')) for cell in col)
-                    col_letter = get_column_letter(col[0].column)
-                    ws.column_dimensions[col_letter].width = max(max_len + 4, 11)
-                
-                ws.row_dimensions[1].height = 28
-                wb.save(excel_buffer)
-                excel_buffer.seek(0)
-                
-                # 다운로드 활성화
-                st.download_button(
-                    label="🟢 엑셀 파일(.xlsx) 다운로드",
-                    data=excel_buffer.getvalue(),
-                    file_name=f"{selected_test}_{sel_quarter}_재원생_종합성적표.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
-            else:
-                st.warning(f"⚠ 현재 선택하신 과정 및 분기에 매칭되는 '재원생' 데이터가 없거나 문항 배점 테이블이 비어있습니다.")
-        else:
-            st.info("데이터베이스에 아직 등록된 분기 정보가 존재하지 않습니다.")
-    else:
-        st.warning("데이터베이스에 학생 성적 기록이 존재하지 않습니다.")
+                else: 
+                    st.error(msg)
