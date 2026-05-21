@@ -471,18 +471,15 @@ with tab1:
             df_info_filtered['문항번호'].astype(str), 
             df_info_filtered['배점'].astype(int)
         ))
-        # 💡 [해결 지점] 딕셔너리 키(문항번호) 내부의 숫자만 추출(추후 '번' 글자가 있어도 안전)하여 오름차순으로 완벽히 정렬합니다.
         question_numbers = sorted(list(q_weight_map.keys()), key=lambda x: int(re.findall(r'\d+', x)[0]) if re.findall(r'\d+', x) else x)
     else:
         q_weight_map = {}
         question_numbers = []
 
     if question_numbers:
-        # 새로고침(리셋)용 고유 세션 스테이트 키를 생성합니다.
         if "input_session_key" not in st.session_state:
             st.session_state["input_session_key"] = 0
             
-        # 이 변수를 모든 입력 요소의 고유 key에 결합하여 변경 시 강제 초기화합니다.
         sk = st.session_state["input_session_key"]
 
         ci1, ci2, ci3, ci4, ci5, ci6 = st.columns([1.2, 1.5, 1.5, 1.5, 1.2, 1.2])
@@ -497,15 +494,16 @@ with tab1:
         st.markdown("---")
         
         answers = {}
-        for i in range(0, len(question_numbers), 5):
-            cols = st.columns(5)
-            for j, q_num in enumerate(question_numbers[i:i+5]):
+        # 💡 가로 한 줄에 4문제씩 딱 떨어지도록 슬라이싱 및 컬럼 배치 수정
+        for i in range(0, len(question_numbers), 4):
+            cols = st.columns(4)
+            for j, q_num in enumerate(question_numbers[i:i+4]):
                 with cols[j]:
                     choice = st.radio(
                         f"**{q_num}번 ({q_weight_map[q_num]}점)**", 
                         options=["O", "X"], 
                         horizontal=True, 
-                        key=f"q_{q_num}_{sk}"  # O/X 라디오 버튼도 새로고침 시 초기화되도록 키 연동
+                        key=f"q_{q_num}_{sk}"
                     )
                     answers[str(q_num)] = q_weight_map[q_num] if choice == "O" else 0
 
@@ -559,10 +557,7 @@ with tab1:
                     
                     st.cache_data.clear() 
                     
-                    # 페이지 본문에 성공 메시지 고정 노출
                     st.success(f"🎉 [{input_type}] {clean_name} 학생의 [{input_quarter}] 성적({total_score}점)이 DB에 성공적으로 저장되었습니다!")
-                    
-                    # 저장 성공 후 세션 스테이트 넘버를 1 올림으로써 모든 입력창과 O/X 컴포넌트를 강제 백지 상태로 만듭니다.
                     st.session_state["input_session_key"] += 1
                     
                     time.sleep(2.0)
