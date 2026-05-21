@@ -81,7 +81,7 @@ def fetch_all_dataframes():
                 new_columns.append(normalize_col(col))
         df_results.columns = new_columns
 
-        # 🔥 [보정] 맞은 개수 및 총점 누락 데이터 실시간 자동 보정/계산 로직
+        # [보정] 맞은 개수 및 총점 누락 데이터 실시간 자동 보정/계산 로직
         if not df_info.empty:
             df_info['문항번호_정제'] = df_info['문항번호'].apply(normalize_col)
             weight_dict = {}
@@ -100,13 +100,13 @@ def fetch_all_dataframes():
                 
                 if test_weights:
                     c_2, c_3, c_4 = 0, 0, 0
-                    calculated_total = 0  # 실시간 계산할 총점 변수
+                    calculated_total = 0  
                     
                     for q_col, weight in test_weights.items():
                         if q_col in df_results.columns:
                             val = res_row[q_col]
                             if str(val).strip().upper() in ['1', '1.0', 'O', '정답', 'TRUE']:
-                                calculated_total += weight  # 정답인 경우 배점만큼 총점에 누적
+                                calculated_total += weight  
                                 if weight == 2: c_2 += 1
                                 elif weight == 3: c_3 += 1
                                 elif weight == 4: c_4 += 1
@@ -119,7 +119,7 @@ def fetch_all_dataframes():
                     if pd.isna(res_row.get('맞은개수_4점')) or res_row.get('맞은개수_4점') == 0:
                         df_results.at[idx, '맞은개수_4점'] = c_4
                         
-                    # 🛠️ [추가] 총점 보정: 총점이 누락되었거나 0점인 경우 채점 기반 데이터로 자동 환산
+                    # 총점 보정
                     if pd.isna(res_row.get('총점')) or res_row.get('총점') == 0:
                         df_results.at[idx, '총점'] = calculated_total
         
@@ -486,12 +486,12 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 
+# 🛠️ [수정 및 고도화] 반명(시트)별로 구분하여 내보내도록 Excel 생성 함수 업그레이드
 def export_excel_styled(df, quarter_name, q_cols):
     wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = f"재원생_성적데이터"
-    
-    ws.views.sheetView[0].showGridLines = True
+    # 기본 생성 시트 제거(동적 생성을 위함)
+    if wb.active:
+        wb.remove(wb.active)
     
     navy_fill = PatternFill(start_color="1A237E", end_color="1A237E", fill_type="solid")
     zebra_fill = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid")
@@ -505,61 +505,83 @@ def export_excel_styled(df, quarter_name, q_cols):
     align_right = Alignment(horizontal="right", vertical="center")
     align_left = Alignment(horizontal="left", vertical="center")
 
-    ws.merge_cells("A1:G1")
-    ws["A1"] = f"JEET 수학학원 [{quarter_name}] 재원생 성적 통합 데이터"
-    ws["A1"].font = Font(name="Malgun Gothic", size=14, bold=True, color="1A237E")
-    ws["A1"].alignment = align_left
-    ws.row_dimensions[1].height = 30
-    
-    ws.append([]) 
-    
     base_headers = ["시험명", "구분", "이름", "반", "학교", "학년", "분기", "총점", "맞은개수_2점", "맞은개수_3점", "맞은개수_4점"]
     valid_q_cols = [q for q in q_cols if q in df.columns]
     headers = base_headers + valid_q_cols
+
+    # 1. 반(Class) 정보가 공백이거나 누락된 경우 처리
+    df['반_정제'] = df['반'].astype(str).str.strip().replace({'0': '미지정', '0.0': '미지정', 'nan': '미지정', '': '미지정'})
     
-    ws.append(headers)
-    ws.row_dimensions[3].height = 26
+    # 2. 반별로 그룹화하여 개별 시트(Sheet) 동적 생성
+    grouped = df.groupby('반_정제')
     
-    for col_idx, header in enumerate(headers, 1):
-        cell = ws.cell(row=3, column=col_idx)
-        cell.fill = navy_fill
-        cell.font = white_font
-        cell.alignment = align_center
-        cell.border = thin_border
+    for class_name, group_df in grouped:
+        # 오픈피엑셀 시트명 특수문자 제한 및 길이 보정 (최대 31자)
+        safe_sheet_name = re.sub(r'[\\*?:/\[\]]', '', str(class_name))[:30]
+        if not safe_sheet_name:
+            safe_sheet_name = "미지정_반"
+            
+        ws = wb.create_sheet(title=safe_sheet_name)
+        ws.views.sheetView[0].showGridLines = True
         
-    for r_idx, (_, row) in enumerate(df.iterrows(), 4):
-        row_values = [row.get(h, "") for h in headers]
-        ws.append(row_values)
-        ws.row_dimensions[r_idx].height = 20
+        # 상단 타이틀 배치
+        ws.merge_cells("A1:G1")
+        ws["A1"] = f"JEET 수학학원 [{quarter_name}] - {safe_sheet_name} 성적 데이터"
+        ws["A1"].font = Font(name="Malgun Gothic", size=14, bold=True, color="1A237E")
+        ws["A1"].alignment = align_left
+        ws.row_dimensions[1].height = 30
         
-        for c_idx in range(1, len(headers) + 1):
-            cell = ws.cell(row=r_idx, column=c_idx)
-            cell.font = normal_font
+        ws.append([]) # 빈줄 추가
+        
+        # 표 헤더 추가
+        ws.append(headers)
+        ws.row_dimensions[3].height = 26
+        
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col_idx)
+            cell.fill = navy_fill
+            cell.font = white_font
+            cell.alignment = align_center
             cell.border = thin_border
             
-            if r_idx % 2 == 1:
-                cell.fill = zebra_fill
-                
-            val = cell.value
-            col_header = headers[c_idx - 1]
+        # 학생 이름 순으로 정렬 후 행 데이터 기입
+        sorted_group_df = group_df.sort_values(by=['이름'])
+        
+        for r_idx, (_, row) in enumerate(sorted_group_df.iterrows(), 4):
+            row_values = [row.get(h, "") for h in headers]
+            ws.append(row_values)
+            ws.row_dimensions[r_idx].height = 20
             
-            if isinstance(val, (int, float)):
-                if col_header in ["총점", "맞은개수_2점", "맞은개수_3점", "맞은개수_4점"]:
-                    cell.alignment = align_right
-                    cell.number_format = "#,##0"
+            for c_idx in range(1, len(headers) + 1):
+                cell = ws.cell(row=r_idx, column=c_idx)
+                cell.font = normal_font
+                cell.border = thin_border
+                
+                # 지브라(얼룩말) 줄무늬 스타일링
+                if r_idx % 2 == 1:
+                    cell.fill = zebra_fill
+                    
+                val = cell.value
+                col_header = headers[c_idx - 1]
+                
+                if isinstance(val, (int, float)):
+                    if col_header in ["총점", "맞은개수_2점", "맞은개수_3점", "맞은개수_4점"]:
+                        cell.alignment = align_right
+                        cell.number_format = "#,##0"
+                    else:
+                        cell.alignment = align_center
                 else:
                     cell.alignment = align_center
-            else:
-                cell.alignment = align_center
-                
-    for col in ws.columns:
-        max_len = 0
-        col_letter = get_column_letter(col[0].column)
-        for cell in col:
-            if cell.row == 1: continue
-            if cell.value:
-                max_len = max(max_len, len(str(cell.value)))
-        ws.column_dimensions[col_letter].width = max(max_len + 4, 10)
+                    
+        # 열 너비 자동 맞춤 조절
+        for col in ws.columns:
+            max_len = 0
+            col_letter = get_column_letter(col[0].column)
+            for cell in col:
+                if cell.row == 1: continue
+                if cell.value:
+                    max_len = max(max_len, len(str(cell.value)))
+            ws.column_dimensions[col_letter].width = max(max_len + 4, 11)
         
     excel_buffer = io.BytesIO()
     wb.save(excel_buffer)
@@ -770,8 +792,8 @@ with tab3:
 
 # --- Tab 4: 분기별 엑셀 추출 ---
 with tab4:
-    st.subheader("📚 분기별 재원생 성적 데이터 엑셀 내보내기")
-    st.markdown("대시보드 상단의 시험 과정과 관계없이, 선택하신 **분기**에서 구분이 **'재원생'**인 모든 학생들의 성적 데이터를 통합하여 엑셀로 추출합니다.")
+    st.subheader("📚 분기별 재원생 성적 데이터 엑셀 내보내기 (반별 시트 구성)")
+    st.markdown("대시보드 상단의 시험 과정과 관계없이, 선택하신 **분기**에서 구분이 **'재원생'**인 학생 데이터를 가져와 **반명별 개별 시트**로 나누어 엑셀을 자동 마스터링합니다.")
     
     if not df_results_all.empty and '분기' in df_results_all.columns:
         quarter_options = sorted(df_results_all['분기'].dropna().astype(str).unique().tolist())
@@ -803,18 +825,18 @@ with tab4:
                 actual_q_cols = [col for col in filtered_df.columns if col.isdigit() and int(col) <= 50]
                 actual_q_cols = sorted(actual_q_cols, key=lambda x: int(x))
                 
-            if '반' in filtered_df.columns:
-                filtered_df = filtered_df.sort_values(by=['반', '이름'] if '이름' in filtered_df.columns else ['반'])
-                
-            st.success(f"🎯 [{excel_quarter}]의 모든 시험 과정에서 총 {len(filtered_df)}명의 재원생 데이터가 통합 확인되었습니다. (누락된 맞은 개수와 총점 모두 백그라운드에서 완벽히 보정되었습니다.)")
+            # 반 리스트 추출하여 요약 안내 문구 노출
+            available_classes = filtered_df['반'].astype(str).str.strip().replace({'0':'미지정','0.0':'미지정','nan':'미지정','':'미지정'}).unique().tolist()
             
-            with st.spinner("통합 엑셀 시트 스타일 마스터링 중..."):
+            st.success(f"🎯 [{excel_quarter}] 재원생 총 {len(filtered_df)}명 확인 완료! 추출되는 반 탭 목록: {', '.join([f'[{c}]' for c in sorted(available_classes)])}")
+            
+            with st.spinner("반별 엑셀 탭 생성 및 스타일 마스터링 중..."):
                 excel_file = export_excel_styled(filtered_df, excel_quarter, actual_q_cols)
                 
-            safe_filename = f"JEET_통합_{excel_quarter}_재원생성적.xlsx".replace(" ", "_")
+            safe_filename = f"JEET_분할_{excel_quarter}_재원생성적.xlsx".replace(" ", "_")
             
             st.download_button(
-                label="📥 깔끔한 통합 엑셀 파일(.xlsx) 다운로드",
+                label="📥 반별 탭 분할 엑셀 파일(.xlsx) 다운로드",
                 data=excel_file.getvalue(),
                 file_name=safe_filename,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
