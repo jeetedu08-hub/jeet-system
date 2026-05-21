@@ -492,22 +492,22 @@ def export_excel_styled(df, quarter_name, q_cols):
     ws = wb.active
     ws.title = "성적데이터"
     
-    # 스타일 정의
+    # 색상 정의
     navy_fill = PatternFill(start_color="1A237E", end_color="1A237E", fill_type="solid")
-    zebra_fill = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid")
+    # 반 구분용 색상 (연한 파랑, 흰색)
+    bg_color_1 = PatternFill(start_color="E8EAF6", end_color="E8EAF6", fill_type="solid")
+    bg_color_2 = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+    
     white_font = Font(name="Malgun Gothic", size=10, bold=True, color="FFFFFF")
     normal_font = Font(name="Malgun Gothic", size=10, bold=False, color="000000")
     thin_border = Border(left=Side(style='thin', color='D3D3D3'), right=Side(style='thin', color='D3D3D3'), 
                          top=Side(style='thin', color='D3D3D3'), bottom=Side(style='thin', color='D3D3D3'))
     
-    # 1. 정렬 로직: 반명 기준 오름차순, 이름 기준 오름차순
+    # 1. 반명, 이름순 정렬
     df['반_정제'] = df['반'].astype(str).str.strip()
     df_sorted = df.sort_values(by=['반_정제', '이름'])
     
-    # 헤더 구성
-    base_headers = ["시험명", "구분", "이름", "반", "학교", "학년", "분기", "총점", "맞은개수_2점", "맞은개수_3점", "맞은개수_4점"]
-    valid_q_cols = [q for q in q_cols if q in df_sorted.columns]
-    headers = base_headers + valid_q_cols
+    headers = ["시험명", "구분", "이름", "반", "학교", "학년", "분기", "총점", "맞은개수_2점", "맞은개수_3점", "맞은개수_4점"] + [q for q in q_cols if q in df.columns]
 
     # 2. 헤더 작성
     for c_idx, header in enumerate(headers, 1):
@@ -517,17 +517,24 @@ def export_excel_styled(df, quarter_name, q_cols):
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = thin_border
 
-    # 3. 데이터 작성 (전체 행 지브라 패턴)
+    # 3. 데이터 작성 및 반별 색상 구분
+    current_class = None
+    color_toggle = True
+    
     for r_idx, (_, row) in enumerate(df_sorted.iterrows(), 2):
+        # 반이 바뀔 때마다 색상 토글
+        if row['반_정제'] != current_class:
+            current_class = row['반_정제']
+            color_toggle = not color_toggle
+        
+        current_fill = bg_color_1 if color_toggle else bg_color_2
+        
         for c_idx, header in enumerate(headers, 1):
             cell = ws.cell(row=r_idx, column=c_idx, value=row.get(header, ""))
             cell.font = normal_font
             cell.border = thin_border
             cell.alignment = Alignment(horizontal="center", vertical="center")
-            
-            # 홀수 행(헤더 제외 1, 3, 5...)에 지브라 패턴 적용
-            if r_idx % 2 == 1:
-                cell.fill = zebra_fill
+            cell.fill = current_fill
     
     # 4. 열 너비 자동 조절
     for col in ws.columns:
