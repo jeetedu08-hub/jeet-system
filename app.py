@@ -489,100 +489,58 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
 # 🛠️ [수정 및 고도화] 반명(시트)별로 구분하여 내보내도록 Excel 생성 함수 업그레이드
 def export_excel_styled(df, quarter_name, q_cols):
     wb = openpyxl.Workbook()
-    # 기본 생성 시트 제거(동적 생성을 위함)
-    if wb.active:
-        wb.remove(wb.active)
+    ws = wb.active
+    ws.title = "성적데이터"
     
+    # 스타일 정의
     navy_fill = PatternFill(start_color="1A237E", end_color="1A237E", fill_type="solid")
-    zebra_fill = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid")
+    zebra_fill = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid") # 연한 회색
     white_font = Font(name="Malgun Gothic", size=10, bold=True, color="FFFFFF")
     normal_font = Font(name="Malgun Gothic", size=10, bold=False, color="000000")
     
-    thin_border_side = Side(border_style="thin", color="D3D3D3")
-    thin_border = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side)
+    thin_border = Border(left=Side(style='thin', color='D3D3D3'), right=Side(style='thin', color='D3D3D3'), 
+                         top=Side(style='thin', color='D3D3D3'), bottom=Side(style='thin', color='D3D3D3'))
     
-    align_center = Alignment(horizontal="center", vertical="center")
-    align_right = Alignment(horizontal="right", vertical="center")
-    align_left = Alignment(horizontal="left", vertical="center")
-
+    # 1. 반별, 이름순 정렬
+    df['반_정제'] = df['반'].astype(str).str.strip()
+    df_sorted = df.sort_values(by=['반_정제', '이름'])
+    
+    # 헤더 구성
     base_headers = ["시험명", "구분", "이름", "반", "학교", "학년", "분기", "총점", "맞은개수_2점", "맞은개수_3점", "맞은개수_4점"]
-    valid_q_cols = [q for q in q_cols if q in df.columns]
+    valid_q_cols = [q for q in q_cols if q in df_sorted.columns]
     headers = base_headers + valid_q_cols
 
-    # 1. 반(Class) 정보가 공백이거나 누락된 경우 처리
-    df['반_정제'] = df['반'].astype(str).str.strip().replace({'0': '미지정', '0.0': '미지정', 'nan': '미지정', '': '미지정'})
-    
-    # 2. 반별로 그룹화하여 개별 시트(Sheet) 동적 생성
-    grouped = df.groupby('반_정제')
-    
-    for class_name, group_df in grouped:
-        # 오픈피엑셀 시트명 특수문자 제한 및 길이 보정 (최대 31자)
-        safe_sheet_name = re.sub(r'[\\*?:/\[\]]', '', str(class_name))[:30]
-        if not safe_sheet_name:
-            safe_sheet_name = "미지정_반"
-            
-        ws = wb.create_sheet(title=safe_sheet_name)
-        ws.views.sheetView[0].showGridLines = True
-        
-        # 상단 타이틀 배치
-        ws.merge_cells("A1:G1")
-        ws["A1"] = f"JEET 수학학원 [{quarter_name}] - {safe_sheet_name} 성적 데이터"
-        ws["A1"].font = Font(name="Malgun Gothic", size=14, bold=True, color="1A237E")
-        ws["A1"].alignment = align_left
-        ws.row_dimensions[1].height = 30
-        
-        ws.append([]) # 빈줄 추가
-        
-        # 표 헤더 추가
-        ws.append(headers)
-        ws.row_dimensions[3].height = 26
-        
-        for col_idx, header in enumerate(headers, 1):
-            cell = ws.cell(row=3, column=col_idx)
-            cell.fill = navy_fill
-            cell.font = white_font
-            cell.alignment = align_center
+    # 2. 헤더 작성
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.value = header
+        cell.fill = navy_fill
+        cell.font = white_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = thin_border
+
+    # 3. 데이터 작성 및 지브라 패턴 적용
+    for r_idx, (_, row) in enumerate(df_sorted.iterrows(), 2):
+        for c_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=r_idx, column=c_idx)
+            cell.value = row.get(header, "")
+            cell.font = normal_font
             cell.border = thin_border
+            cell.alignment = Alignment(horizontal="center", vertical="center")
             
-        # 학생 이름 순으로 정렬 후 행 데이터 기입
-        sorted_group_df = group_df.sort_values(by=['이름'])
-        
-        for r_idx, (_, row) in enumerate(sorted_group_df.iterrows(), 4):
-            row_values = [row.get(h, "") for h in headers]
-            ws.append(row_values)
-            ws.row_dimensions[r_idx].height = 20
-            
-            for c_idx in range(1, len(headers) + 1):
-                cell = ws.cell(row=r_idx, column=c_idx)
-                cell.font = normal_font
-                cell.border = thin_border
-                
-                # 지브라(얼룩말) 줄무늬 스타일링
-                if r_idx % 2 == 1:
-                    cell.fill = zebra_fill
-                    
-                val = cell.value
-                col_header = headers[c_idx - 1]
-                
-                if isinstance(val, (int, float)):
-                    if col_header in ["총점", "맞은개수_2점", "맞은개수_3점", "맞은개수_4점"]:
-                        cell.alignment = align_right
-                        cell.number_format = "#,##0"
-                    else:
-                        cell.alignment = align_center
-                else:
-                    cell.alignment = align_center
-                    
-        # 열 너비 자동 맞춤 조절
-        for col in ws.columns:
-            max_len = 0
-            col_letter = get_column_letter(col[0].column)
-            for cell in col:
-                if cell.row == 1: continue
-                if cell.value:
-                    max_len = max(max_len, len(str(cell.value)))
-            ws.column_dimensions[col_letter].width = max(max_len + 4, 11)
-        
+            # [핵심] 전체 행 지브라 패턴 (홀수 행마다 배경색)
+            if r_idx % 2 == 1:
+                cell.fill = zebra_fill
+    
+    # 4. 열 너비 자동 조절
+    for col in ws.columns:
+        max_len = 0
+        column = col[0].column_letter
+        for cell in col:
+            if cell.value:
+                max_len = max(max_len, len(str(cell.value)))
+        ws.column_dimensions[column].width = max_len + 4
+
     excel_buffer = io.BytesIO()
     wb.save(excel_buffer)
     excel_buffer.seek(0)
