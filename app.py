@@ -66,7 +66,7 @@ def fetch_all_dataframes():
             nums = re.findall(r'\d+', col_str)
             return nums[0] if nums else col_str
             
-        meta_cols = ['id', 'created_at', '시험명', '이름', '반', '학교', '학년', '분기', '구분']
+        meta_cols = ['id', 'created_at', '시험명', '이름', '반', '학교', '학년', '분기', '구분', '총점', '맞은개수_2점', '맞은개수_3점', '맞은개수_4점']
         new_columns = []
         for col in df_results.columns:
             if col in meta_cols:
@@ -196,7 +196,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     c_best = cat_ratio[cat_ratio >= 80].index.str.replace('\n', '').tolist()
     c_good = cat_ratio[(cat_ratio >= 50) & (cat_ratio < 80)].index.str.replace('\n', '').tolist()
     c_weak = cat_ratio[(cat_ratio >= 20) & (cat_ratio < 50)].index.str.replace('\n', '').tolist()
-    c_warn = cat_ratio[cat_ratio < 20].index.str.replace('\n', '').tolist()
+    c_warn = cat_ratio[cat_ratio < 20].index.tolist()
 
     diag_combined = ""
     if c_best: diag_combined += f"특히 {', '.join([f'[{c}]' for c in c_best])} 영역에서 정교한 논리 구조와 높은 응용력을 보이며 압도적인 강점을 나타냅니다. 현재의 감각을 유지하며 최고 난도 문항을 통해 사고의 확장을 이어가야 합니다. "
@@ -281,7 +281,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         fig.text([0.22, 0.50, 0.78][i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
 
 
-# --- 4. 데이터 가공 헬퍼 함수 (에러 해결 수정본) ---
+# --- 4. 데이터 가공 헬퍼 함수 ---
 def prepare_report_data(selected_test):
     df_info, df_results = fetch_all_dataframes()
     
@@ -302,7 +302,6 @@ def prepare_report_data(selected_test):
     q_cols = df_info['문항번호'].tolist()
     
     def safe_to_binary(val):
-        # 만약 val이 판다스 Series나 배열 형태로 비정상 호출되면 에러 방지 후 0 처리
         if hasattr(val, 'any') or hasattr(val, 'all'):
             return 0
         if pd.isna(val): 
@@ -321,8 +320,6 @@ def prepare_report_data(selected_test):
         df_scores = pd.DataFrame(index=df_results.index, columns=q_cols)
         for q in q_cols:
             if q in df_results.columns:
-                # 💡 핵심 수정 포인트: 중복 컬럼 유무 확인
-                # df_results[q]가 중복으로 인해 DataFrame(2차원)일 경우 첫 번째 열만 가져옴
                 target_col = df_results[q]
                 if isinstance(target_col, pd.DataFrame):
                     target_col = target_col.iloc[:, 0]
@@ -362,7 +359,6 @@ def generate_jeet_expert_report(target_name, selected_test):
             student_answers = []
             for q in analysis['문항번호']:
                 val = s_row.get(str(q), None)
-                # 만약 행 데이터(s_row) 내부에도 컬럼 중복으로 인해 Series 데이터가 발견되면 첫 번째 값 추출
                 if isinstance(val, pd.Series):
                     val = val.iloc[0]
                 student_answers.append(safe_to_binary(val) if val is not None else 0)
@@ -553,6 +549,7 @@ with tab1:
                 st.error("⚠ 이름을 입력해주세요.")
             else:
                 try:
+                    # 💡 핵심 수정 포인트: new_record 딕셔너리에 총점 및 맞은 개수 컬럼 데이터 병합
                     new_record = {
                         "시험명": selected_test,
                         "구분": input_type,
@@ -560,7 +557,11 @@ with tab1:
                         "반": input_class,
                         "학교": input_school,
                         "학년": input_grade,
-                        "분기": input_quarter
+                        "분기": input_quarter,
+                        "총점": total_score,
+                        "맞은개수_2점": count_2pt,
+                        "맞은개수_3점": count_3pt,
+                        "맞은개수_4점": count_4pt
                     }
                     for q_num in question_numbers:
                         new_record[str(q_num)] = 1 if answers[str(q_num)] > 0 else 0
@@ -577,7 +578,7 @@ with tab1:
                     st.rerun()
                     
                 except Exception as e: 
-                    st.error(f"저장 중 오류 발생: {e}\n(잠깐! Supabase DB에 '구분' 컬럼을 추가하셨나요?)")
+                    st.error(f"저장 중 오류 발생: {e}\n(잠깐! Supabase DB에 '총점', '맞은개수_2점', '맞은개수_3점', '맞은개수_4점' 컬럼을 추가하셨나요?)")
 
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
