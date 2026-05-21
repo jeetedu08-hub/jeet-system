@@ -471,13 +471,14 @@ with tab1:
             df_info_filtered['문항번호'].astype(str), 
             df_info_filtered['배점'].astype(int)
         ))
-        question_numbers = list(q_weight_map.keys())
+        # 💡 [해결 지점] 딕셔너리 키(문항번호) 내부의 숫자만 추출(추후 '번' 글자가 있어도 안전)하여 오름차순으로 완벽히 정렬합니다.
+        question_numbers = sorted(list(q_weight_map.keys()), key=lambda x: int(re.findall(r'\d+', x)[0]) if re.findall(r'\d+', x) else x)
     else:
         q_weight_map = {}
         question_numbers = []
 
     if question_numbers:
-        # 💡 [핵심 제어] 새로고침(리셋)용 고유 세션 스테이트 키를 생성합니다.
+        # 새로고침(리셋)용 고유 세션 스테이트 키를 생성합니다.
         if "input_session_key" not in st.session_state:
             st.session_state["input_session_key"] = 0
             
@@ -504,7 +505,7 @@ with tab1:
                         f"**{q_num}번 ({q_weight_map[q_num]}점)**", 
                         options=["O", "X"], 
                         horizontal=True, 
-                        key=f"q_{q_num}_{sk}"  # 💡 O/X 라디오 버튼도 새로고침 시 초기화되도록 키 연동
+                        key=f"q_{q_num}_{sk}"  # O/X 라디오 버튼도 새로고침 시 초기화되도록 키 연동
                     )
                     answers[str(q_num)] = q_weight_map[q_num] if choice == "O" else 0
 
@@ -561,7 +562,7 @@ with tab1:
                     # 페이지 본문에 성공 메시지 고정 노출
                     st.success(f"🎉 [{input_type}] {clean_name} 학생의 [{input_quarter}] 성적({total_score}점)이 DB에 성공적으로 저장되었습니다!")
                     
-                    # 💡 [핵심 변경] 저장 성공 후 세션 스테이트 넘버를 1 올림으로써 모든 입력창과 O/X 컴포넌트를 강제 백지 상태로 만듭니다.
+                    # 저장 성공 후 세션 스테이트 넘버를 1 올림으로써 모든 입력창과 O/X 컴포넌트를 강제 백지 상태로 만듭니다.
                     st.session_state["input_session_key"] += 1
                     
                     time.sleep(2.0)
