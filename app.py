@@ -13,6 +13,10 @@ from supabase import create_client, Client
 import zipfile
 import re
 import time 
+# 💡 엑셀 스타일링을 위한 라이브러리 추가
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
 
 # --- 1. 환경 및 폰트 설정 ---
 font_path = "malgun.ttf"
@@ -66,7 +70,7 @@ def fetch_all_dataframes():
             nums = re.findall(r'\d+', col_str)
             return nums[0] if nums else col_str
             
-        meta_cols = ['id', 'created_at', '시험명', '이름', '반', '학교', '학년', '분기', '구분']
+        meta_cols = ['id', 'created_at', '시험명', '이름', '반', '학교', '학년', '분기', '구분', '총점']
         new_columns = []
         for col in df_results.columns:
             if col in meta_cols:
@@ -461,7 +465,7 @@ if not test_list:
 selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
 df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 
-tab1, tab2, tab3 = st.tabs(["✍️ 성적 입력", "📊 개별 리포트 출력", "📚 반별 일괄 리포트 출력"])
+tab1, tab2, tab3, tab4 = st.tabs(["✍️ 성적 입력", "📊 개별 리포트 출력", "📚 반별 일괄 리포트 출력", "📥 재원생 성적 다운로드"])
 
 with tab1:
     st.subheader(f"[{selected_test}] 학생 성적 입력")
@@ -494,7 +498,6 @@ with tab1:
         st.markdown("---")
         
         answers = {}
-        # 💡 가로 한 줄에 4문제씩 딱 떨어지도록 슬라이싱 및 컬럼 배치 수정
         for i in range(0, len(question_numbers), 4):
             cols = st.columns(4)
             for j, q_num in enumerate(question_numbers[i:i+4]):
@@ -547,7 +550,8 @@ with tab1:
                         "반": input_class,
                         "학교": input_school,
                         "학년": input_grade,
-                        "분기": input_quarter
+                        "분기": input_quarter,
+                        "총점": total_score 
                     }
                     for q_num in question_numbers:
                         new_record[str(q_num)] = 1 if answers[str(q_num)] > 0 else 0
@@ -564,7 +568,7 @@ with tab1:
                     st.rerun()
                     
                 except Exception as e: 
-                    st.error(f"저장 중 오류 발생: {e}\n(잠깐! Supabase DB에 '구분' 컬럼을 추가하셨나요?)")
+                    st.error(f"저장 중 오류 발생: {e}")
 
 with tab2:
     st.subheader(f"[{selected_test}] 개별 심층 분석 리포트 생성")
@@ -625,3 +629,151 @@ with tab3:
                     st.download_button("📥 일괄 다운로드 (ZIP)", buf.getvalue(), f"{target_class}_리포트_모음.zip", "application/zip")
                 else: 
                     st.error(msg)
+
+# 💡 [로직 고도화] 4번째 탭: 배점별 정답 개수 실시간 연산 및 엑셀 다운로드 기능
+with tab4:
+    st.subheader("📥 분기별 재원생 성적 데이터 엑셀 다운로드")
+    st.markdown("선택한 **시험 과정** 및 **분기**에 해당되는 **재원생**들의 지표(2,3,4점 맞은 개수, 총점)를 포함해 정렬된 엑셀 파일을 추출합니다.")
+    
+    if not df_results_all.empty:
+        df_test_res = df_results_all[df_results_all['시험명'] == selected_test]
+        all_quarters = df_test_res['분기'].astype(str).str.strip().unique().tolist()
+        quarter_list = sorted([q for q in all_quarters if q and q != '0' and q != 'nan'])
+        
+        if quarter_list:
+            sel_quarter = st.selectbox("📥 다운로드할 분기를 선택하세요:", quarter_list, key="excel_quarter_select")
+            
+            # 1. 필터링 (선택 시험, 선택 분기, 재원생)
+            df_filtered_excel = df_test_res[
+                (df_test_res['분기'].astype(str).str.strip() == sel_quarter) & 
+                (df_test_res['구분'].astype(str).str.strip() == '재원생')
+            ].copy()
+            
+            # test_info 테이블을 기준으로 문항별 배점 맵 생성
+            if not df_info_filtered.empty:
+                excel_q_weight_map = dict(zip(
+                    df_info_filtered['문항번호'].astype(str), 
+                    df_info_filtered['배점'].astype(int)
+                ))
+                excel_question_numbers = sorted(list(excel_q_weight_map.keys()), key=lambda x: int(re.findall(r'\d+', x)[0]) if re.findall(r'\d+', x) else x)
+            else:
+                excel_q_weight_map = {}
+                excel_question_numbers = []
+            
+            if not df_filtered_excel.empty and excel_question_numbers:
+                
+                # 2. 💡 각 학생별로 2점, 3점, 4점 맞은 문항 개수를 실시간 계산하여 새로운 컬럼 추가
+                count_2pt_list = []
+                count_3pt_list = []
+                count_4pt_list = []
+                
+                for idx, row in df_filtered_excel.iterrows():
+                    c2, c3, c4 = 0, 0, 0
+                    for q in excel_question_numbers:
+                        # 수파베이스에서 문항 컬럼 값이 1(정답)인지 확인
+                        val = row.get(q, 0)
+                        # 정답 데이터가 문자나 실수 형태로 들어올 수 있으므로 변환 처리
+                        is_correct = 1 if str(val).strip().split('.')[0] in ['1', 'O', '정답', 'TRUE'] else 0
+                        
+                        if is_correct == 1:
+                            weight = excel_q_weight_map.get(q, 0)
+                            if weight == 2: c2 += 1
+                            elif weight == 3: c3 += 1
+                            elif weight == 4: c4 += 1
+                    
+                    count_2pt_list.append(c2)
+                    count_3pt_list.append(c3)
+                    count_4pt_list.append(c4)
+                
+                df_filtered_excel['2점 맞은 개수'] = count_2pt_list
+                df_filtered_excel['3점 맞은 개수'] = count_3pt_list
+                df_filtered_excel['4점 맞은 개수'] = count_4pt_list
+                
+                # 만약 기존 데이터베이스에 '총점'이 없거나 누락된 경우를 대비해 점수 재검증 연산
+                if '총점' not in df_filtered_excel.columns:
+                    df_filtered_excel['총점'] = df_filtered_excel.apply(
+                        lambda r: sum(excel_q_weight_map.get(q, 0) for q in excel_question_numbers if str(r.get(q, 0)).strip().split('.')[0] in ['1', 'O']), axis=1
+                    )
+                
+                # 3. 💡 요청하신 컬럼 배치 순서 정의 (기본 인적사항 -> 요약 지표 -> 문항별 세부 정답여부)
+                base_meta_cols = ['시험명', '구분', '이름', '반', '학교', '학년', '분기']
+                requested_summary_cols = ['2점 맞은 개수', '3점 맞은 개수', '4점 맞은 개수', '총점']
+                
+                final_col_order = base_meta_cols + requested_summary_cols + excel_question_numbers
+                df_filtered_excel = df_filtered_excel.reindex(columns=final_col_order)
+                
+                st.markdown(f"**📊 필터링된 재원생 수:** `{len(df_filtered_excel)}명`")
+                st.dataframe(df_filtered_excel, use_container_width=True)
+                
+                # 4. 💡 openpyxl을 활용한 프리미엄 엑셀 컴파일 및 스타일 디자인
+                excel_buffer = io.BytesIO()
+                wb = openpyxl.Workbook()
+                ws = wb.active
+                ws.title = "재원생성적"
+                
+                # 폰트 및 테마 색상 선언 (JEET Brand Identity 연계)
+                font_name = "Malgun Gothic"
+                header_fill = PatternFill(start_color="1A237E", end_color="1A237E", fill_type="solid") # Navy
+                summary_fill = PatternFill(start_color="F1F3F9", end_color="F1F3F9", fill_type="solid") # Soft Gray-Blue
+                
+                font_header = Font(name=font_name, size=11, bold=True, color="FFFFFF")
+                font_data = Font(name=font_name, size=10)
+                font_summary = Font(name=font_name, size=10, bold=True, color="1A237E")
+                
+                thin_border_side = Side(border_style="thin", color="E0E0E0")
+                grid_border = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side)
+                
+                # 헤더 작성 및 서식 적용
+                ws.append(final_col_order)
+                for col_idx in range(1, len(final_col_order) + 1):
+                    cell = ws.cell(row=1, column=col_idx)
+                    cell.fill = header_fill
+                    cell.font = font_header
+                    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                
+                # 데이터 행 작성 및 조건별 서식 스타일링
+                for idx, row in df_filtered_excel.iterrows():
+                    row_values = [row[c] for c in final_col_order]
+                    ws.append(row_values)
+                    
+                    curr_row_idx = ws.max_row
+                    for col_idx, col_name in enumerate(final_col_order, start=1):
+                        data_cell = ws.cell(row=curr_row_idx, column=col_idx)
+                        data_cell.font = font_data
+                        data_cell.border = grid_border
+                        
+                        # 정렬 조건 분기
+                        if col_name in ['시험명', '이름', '반', '학교']:
+                            data_cell.alignment = Alignment(horizontal="left", vertical="center")
+                        else:
+                            data_cell.alignment = Alignment(horizontal="center", vertical="center")
+                        
+                        # 요청 지표 컬럼 강조 음영 처리
+                        if col_name in requested_summary_cols:
+                            data_cell.fill = summary_fill
+                            data_cell.font = font_summary
+                
+                # 가독성을 위한 열 너비 자동 맞춤 조정
+                for col in ws.columns:
+                    max_len = max(len(str(cell.value or '')) for cell in col)
+                    col_letter = get_column_letter(col[0].column)
+                    ws.column_dimensions[col_letter].width = max(max_len + 4, 11)
+                
+                ws.row_dimensions[1].height = 28 # 헤더 행 높이 여유있게 배치
+                
+                wb.save(excel_buffer)
+                excel_buffer.seek(0)
+                
+                st.download_button(
+                    label="🟢 엑셀 파일(.xlsx) 다운로드",
+                    data=excel_buffer.getvalue(),
+                    file_name=f"{selected_test}_{sel_quarter}_재원생_종합성적표.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            else:
+                st.warning(f"⚠ 선택하신 [{selected_test}] 과정의 [{sel_quarter}]에 등록된 '재원생' 데이터가 없거나 문항 매핑 정보가 비어있습니다.")
+        else:
+            st.info("데이터베이스에 아직 등록된 분기 정보가 없습니다.")
+    else:
+        st.warning("데이터베이스에 학생 성적 기록이 존재하지 않습니다.")
