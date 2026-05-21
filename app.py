@@ -66,6 +66,7 @@ def fetch_all_dataframes():
             
         df_results = df_results.fillna(0)
         
+        # 문항 번호 표준화 함수
         def normalize_col(col_name):
             col_str = str(col_name).strip().split('.')[0]
             nums = re.findall(r'\d+', col_str)
@@ -79,6 +80,40 @@ def fetch_all_dataframes():
             else:
                 new_columns.append(normalize_col(col))
         df_results.columns = new_columns
+
+        # 🔥 [보정] 맞은 개수가 누락되었거나 0인 경우 실시간 자동 계산 로직
+        if not df_info.empty:
+            df_info['문항번호_정제'] = df_info['문항번호'].apply(normalize_col)
+            weight_dict = {}
+            for _, info_row in df_info.iterrows():
+                t_name = str(info_row.get('시험명', '')).strip()
+                q_num = str(info_row.get('문항번호_정제', '')).strip()
+                try:
+                    w_val = int(float(info_row.get('배점', 3)))
+                except:
+                    w_val = 3
+                weight_dict[(t_name, q_num)] = w_val
+
+            for idx, res_row in df_results.iterrows():
+                current_test = str(res_row.get('시험명', '')).strip()
+                test_weights = {k[1]: v for k, v in weight_dict.items() if k[0] == current_test}
+                
+                if test_weights:
+                    c_2, c_3, c_4 = 0, 0, 0
+                    for q_col, weight in test_weights.items():
+                        if q_col in df_results.columns:
+                            val = res_row[q_col]
+                            if str(val).strip().upper() in ['1', '1.0', 'O', '정답', 'TRUE']:
+                                if weight == 2: c_2 += 1
+                                elif weight == 3: c_3 += 1
+                                elif weight == 4: c_4 += 1
+                    
+                    if pd.isna(res_row.get('맞은개수_2점')) or res_row.get('맞은개수_2점') == 0:
+                        df_results.at[idx, '맞은개수_2점'] = c_2
+                    if pd.isna(res_row.get('맞은개수_3점')) or res_row.get('맞은개수_3점') == 0:
+                        df_results.at[idx, '맞은개수_3점'] = c_3
+                    if pd.isna(res_row.get('맞은개수_4점')) or res_row.get('맞은개수_4점') == 0:
+                        df_results.at[idx, '맞은개수_4점'] = c_4
         
     return df_info, df_results
 
@@ -557,7 +592,7 @@ if not test_list:
 selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요:", test_list)
 df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 
-# 💡 상위 레이아웃에서 탭을 먼저 명확하게 선언합니다.
+# 상위 레이아웃에서 탭 선언 순서 동기화
 tab1, tab2, tab3, tab4 = st.tabs(["✍️ 성적 입력", "📊 개별 리포트 출력", "📚 반별 일괄 리포트 출력", "🟢 분기별 엑셀 추출"])
 
 # --- Tab 1: 성적 입력 ---
@@ -725,7 +760,7 @@ with tab3:
                     st.download_button("📥 일괄 다운로드 (ZIP)", buf.getvalue(), f"{target_class}_리포트_모음.zip", "application/zip")
                 else: st.error(msg)
 
-# --- Tab 4: 분기별 엑셀 추출 (상단 시험 대시보드 필터 해제 버전) ---
+# --- Tab 4: 분기별 엑셀 추출 ---
 with tab4:
     st.subheader("📚 분기별 재원생 성적 데이터 엑셀 내보내기")
     st.markdown("대시보드 상단의 시험 과정과 관계없이, 선택하신 **분기**에서 구분이 **'재원생'**인 모든 학생들의 성적 데이터를 통합하여 엑셀로 추출합니다.")
@@ -738,7 +773,6 @@ with tab4:
     excel_quarter = st.selectbox("📥 내보낼 분기를 선택하세요:", quarter_options, key="excel_quarter_select")
     
     if st.button("📊 해당 분기 재원생 통합 엑셀 파일 생성하기", type="primary"):
-        # 1. 오직 분기 정보와 재원생 여부 필터링만으로 데이터를 구축
         filtered_df = df_results_all[
             (df_results_all['분기'].astype(str).str.strip() == excel_quarter.strip()) & 
             (df_results_all['구분'].astype(str).str.strip() == '재원생')
@@ -747,7 +781,6 @@ with tab4:
         if filtered_df.empty:
             st.warning(f"⚠ 선택하신 [{excel_quarter}] 분기에는 '재원생' 데이터가 존재하지 않습니다.")
         else:
-            # 2. 해당 분기에 존재하는 모든 시험 정보에서 유효 문항 수 동적 로드
             distinct_tests = filtered_df['시험명'].dropna().unique().tolist()
             df_info_filtered = df_info_all[df_info_all['시험명'].isin(distinct_tests)]
             
@@ -765,9 +798,8 @@ with tab4:
             if '반' in filtered_df.columns:
                 filtered_df = filtered_df.sort_values(by=['반', '이름'] if '이름' in filtered_df.columns else ['반'])
                 
-            st.success(f"🎯 [{excel_quarter}]의 모든 시험 과정에서 총 {len(filtered_df)}명의 재원생 데이터가 통합 확인되었습니다.")
+            st.success(f"🎯 [{excel_quarter}]의 모든 시험 과정에서 총 {len(filtered_df)}명의 재원생 데이터가 통합 확인되었습니다. (누락된 맞은 개수도 백그라운드에서 자동 보정되었습니다.)")
             
-            # 3. 엑셀 변환 및 스타일러에 문항 리스트 바인딩
             with st.spinner("통합 엑셀 시트 스타일 마스터링 중..."):
                 excel_file = export_excel_styled(filtered_df, excel_quarter, actual_q_cols)
                 
