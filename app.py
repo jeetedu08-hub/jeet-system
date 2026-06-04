@@ -42,16 +42,25 @@ COLOR_AVG = '#757575'
 COLOR_GRID = '#E0E0E0'
 COLOR_BG = '#F8F9FA'
 
-# --- 🛠️ 2. Supabase 연동 및 캠퍼스 동적 스위칭 설정 ---
+# --- 🛠️ 2. Supabase 연동 및 캠퍼스 동적 스위칭 설정 (수정 완료) ---
 def init_supabase_dynamic():
     """
     스트림릿 Secrets에 설정된 환경변수 정보를 기반으로
     죽전 또는 영통 캠퍼스 DB로 동적 연결하고 캠퍼스 맞춤 설정을 반환합니다.
     """
-    # 1. 영통 캠퍼스 전용 Secrets 세팅이 존재하는 경우 (영통 주소 접속 시)
-    if "yeongtong_supabase" in st.secrets:
-        url = st.secrets["yeongtong_supabase"]["url"]
-        key = st.secrets["yeongtong_supabase"]["key"]
+    # 금고(Secrets)에 원장님이 새로 입력하신 campus_name이 있는지 먼저 확인합니다.
+    supabase_secrets = st.secrets.get("supabase", {})
+    secret_campus_name = supabase_secrets.get("campus_name", "")
+
+    # 1. 영통 캠퍼스 전용 세팅이 존재하거나, 금고 이름표가 '영통캠퍼스'인 경우
+    if "yeongtong_supabase" in st.secrets or secret_campus_name == "영통캠퍼스":
+        if "yeongtong_supabase" in st.secrets:
+            url = st.secrets["yeongtong_supabase"]["url"]
+            key = st.secrets["yeongtong_supabase"]["key"]
+        else:
+            url = supabase_secrets.get("url")
+            key = supabase_secrets.get("key")
+            
         campus_name = "영통캠퍼스"
         campus_config = {
             "title_text": "📊 JEET 영통캠퍼스 성적 통합 관리 시스템",
@@ -60,15 +69,15 @@ def init_supabase_dynamic():
                 ("영통 캠퍼스 주소 및 문의처", "전화번호 및 상세 주소를 입력하세요")
             ]
         }
-    # 2. 정보가 없으면 기본 죽전 캠퍼스로 자동 작동 (죽전 주소 접속 시)
+    # 2. 그 외에는 기본 죽전 캠퍼스로 자동 작동
     else:
         if "jukjeon_supabase" in st.secrets:
             url = st.secrets["jukjeon_supabase"]["url"]
             key = st.secrets["jukjeon_supabase"]["key"]
         else:
-            # 기존 구형 Secrets 키 구조 하위 호환 대응
-            url = st.secrets.get("SUPABASE_URL", st.secrets.get("supabase", {}).get("url"))
-            key = st.secrets.get("SUPABASE_KEY", st.secrets.get("supabase", {}).get("key"))
+            # 기존 구형 Secrets 및 공통 [supabase] 구조 대응
+            url = st.secrets.get("SUPABASE_URL", supabase_secrets.get("url"))
+            key = st.secrets.get("SUPABASE_KEY", supabase_secrets.get("key"))
             
         campus_name = "죽전캠퍼스"
         campus_config = {
