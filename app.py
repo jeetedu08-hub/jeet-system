@@ -42,16 +42,57 @@ COLOR_AVG = '#757575'
 COLOR_GRID = '#E0E0E0'
 COLOR_BG = '#F8F9FA'
 
-# --- 2. Supabase 연동 및 캐시 설정 ---
-@st.cache_resource
-def init_supabase() -> Client:
-    url: str = st.secrets["SUPABASE_URL"]
-    key: str = st.secrets["SUPABASE_KEY"]
-    return create_client(url, key)
+# --- 🛠️ 2. Supabase 연동 및 캠퍼스 동적 스위칭 설정 ---
+def init_supabase_dynamic():
+    """
+    스트림릿 Secrets에 설정된 환경변수 정보를 기반으로
+    죽전 또는 영통 캠퍼스 DB로 동적 연결하고 캠퍼스 맞춤 설정을 반환합니다.
+    """
+    # 1. 영통 캠퍼스 전용 Secrets 세팅이 존재하는 경우 (영통 주소 접속 시)
+    if "yeongtong_supabase" in st.secrets:
+        url = st.secrets["yeongtong_supabase"]["url"]
+        key = st.secrets["yeongtong_supabase"]["key"]
+        campus_name = "영통캠퍼스"
+        campus_config = {
+            "title_text": "📊 JEET 영통캠퍼스 성적 통합 관리 시스템",
+            "logo_file": "logo_yeongtong.png", # 영통용 로고 파일명
+            "footer_campuses": [
+                ("영통 캠퍼스 주소 및 문의처", "전화번호 및 상세 주소를 입력하세요")
+            ]
+        }
+    # 2. 정보가 없으면 기본 죽전 캠퍼스로 자동 작동 (죽전 주소 접속 시)
+    else:
+        if "jukjeon_supabase" in st.secrets:
+            url = st.secrets["jukjeon_supabase"]["url"]
+            key = st.secrets["jukjeon_supabase"]["key"]
+        else:
+            # 기존 구형 Secrets 키 구조 하위 호환 대응
+            url = st.secrets.get("SUPABASE_URL", st.secrets.get("supabase", {}).get("url"))
+            key = st.secrets.get("SUPABASE_KEY", st.secrets.get("supabase", {}).get("key"))
+            
+        campus_name = "죽전캠퍼스"
+        campus_config = {
+            "title_text": "📊 JEET 죽전캠퍼스 성적 통합 관리 시스템",
+            "logo_file": "logo.png", # 기존 쓰시던 죽전 로고 파일명
+            "footer_campuses": [
+                ("수지 캠퍼스: 276-8003", "풍덕천로 129번길 16-1"), 
+                ("죽전 캠퍼스: 263-8003", "기흥구 죽현로 29"), 
+                ("광교 캠퍼스: 257-8003", "영통구 혜명로 10")
+            ]
+        }
+    return create_client(url, key), campus_name, campus_config
+
+# 동적 연결 및 캠퍼스 글로벌 변수 선언
+try:
+    supabase, CURRENT_CAMPUS, CAMPUS_CFG = init_supabase_dynamic()
+except Exception as e:
+    st.error(f"데이터베이스 연결 실패: {e}")
+    st.stop()
+
 
 @st.cache_data(ttl=1)
 def fetch_all_dataframes():
-    supabase = init_supabase()
+    # 동적으로 선택된 supabase 객체를 기반으로 조회 진행
     info_res = supabase.table("test_info").select("*").execute()
     df_info = pd.DataFrame(info_res.data)
     
@@ -131,8 +172,10 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
     fig.patches.append(border)
 
-    if os.path.exists("logo.png"):
-        logo_img = plt.imread("logo.png")
+    # [수정] 캠퍼스별 맞춤 로고 이미지 자동 처리
+    logo_file = CAMPUS_CFG["logo_file"]
+    if os.path.exists(logo_file):
+        logo_img = plt.imread(logo_file)
         logo_img_axes = fig.add_axes([0.80, 0.915, 0.15, 0.045], zorder=15)
         logo_img_axes.imshow(logo_img)
         logo_img_axes.axis('off')
@@ -323,10 +366,14 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         curr_y -= (y_offset + (num_lines * line_height) + section_gap)
 
     line_footer = plt.Line2D([0.05, 0.95], [0.10, 0.10], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure); fig.lines.append(line_footer)
-    campuses = [("수지 캠퍼스: 276-8003", "풍덕천로 129번길 16-1"), ("죽전 캠퍼스: 263-8003", "기흥구 죽현로 29"), ("광교 캠퍼스: 257-8003", "영통구 혜명로 10")]
+    
+    # [수정] 하단 캠퍼스 안내 주소록 자동 분기 매핑
+    campuses = CAMPUS_CFG["footer_campuses"]
     for i, (name, addr) in enumerate(campuses):
-        fig.text([0.22, 0.50, 0.78][i], 0.07, name, ha='center', fontsize=10, fontweight='bold', color=COLOR_NAVY)
-        fig.text([0.22, 0.50, 0.78][i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
+        # 영통 캠퍼스 1개인 경우 중앙 정렬 처리, 죽전 3개인 경우 균등 처리 자동 대응
+        pos_x = [0.50] if len(campuses) == 1 else [0.22, 0.50, 0.78]
+        fig.text(pos_x[i], 0.07, name, ha='center', fontsize=10, fontweight='bold', color=COLOR_NAVY)
+        fig.text(pos_x[i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
 
 
 # --- 4. 데이터 가공 헬퍼 함수 ---
@@ -486,13 +533,11 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 
-# 🛠️ [수정 및 고도화] 반명(시트)별로 구분하여 내보내도록 Excel 생성 함수 업그레이드
 def export_excel_styled(df, quarter_name, q_cols):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "성적데이터"
     
-    # 색상 정의
     navy_fill = PatternFill(start_color="1A237E", end_color="1A237E", fill_type="solid")
     bg_color_1 = PatternFill(start_color="E8EAF6", end_color="E8EAF6", fill_type="solid")
     bg_color_2 = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
@@ -502,14 +547,11 @@ def export_excel_styled(df, quarter_name, q_cols):
     thin_border = Border(left=Side(style='thin', color='D3D3D3'), right=Side(style='thin', color='D3D3D3'), 
                          top=Side(style='thin', color='D3D3D3'), bottom=Side(style='thin', color='D3D3D3'))
     
-    # 1. 정렬 로직
     df['반_정제'] = df['반'].astype(str).str.strip()
     df_sorted = df.sort_values(by=['반_정제', '이름'])
     
-# [수정] 문항별 데이터(q_cols)는 빼고, 맞은 개수 요약 열은 다시 포함!
     headers = ["시험명", "구분", "이름", "반", "학교", "학년", "분기", "총점", "맞은개수_2점", "맞은개수_3점", "맞은개수_4점"]
 
-    # 2. 헤더 작성
     for c_idx, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=c_idx, value=header)
         cell.fill = navy_fill
@@ -517,7 +559,6 @@ def export_excel_styled(df, quarter_name, q_cols):
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = thin_border
 
-    # 3. 데이터 작성 및 반별 색상 구분
     current_class = None
     color_toggle = True
     
@@ -528,7 +569,6 @@ def export_excel_styled(df, quarter_name, q_cols):
         
         current_fill = bg_color_1 if color_toggle else bg_color_2
         
-        # [수정] 헤더에 해당하는 열만 데이터를 기입
         for c_idx, header in enumerate(headers, 1):
             cell = ws.cell(row=r_idx, column=c_idx, value=row.get(header, ""))
             cell.font = normal_font
@@ -536,7 +576,6 @@ def export_excel_styled(df, quarter_name, q_cols):
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.fill = current_fill
     
-    # 4. 열 너비 자동 조절
     for col in ws.columns:
         max_len = 0
         column = col[0].column_letter
@@ -561,10 +600,16 @@ if st.sidebar.button("🔄 데이터베이스 새로고침", use_container_width
 
 st.sidebar.markdown("---") 
 
+# [수정] 사이드바 최상단에 현재 동적으로 선택되어 구동 중인 캠퍼스 인디케이터 상시 노출!
+st.sidebar.markdown(f"### 🏢 현재 접속: **{CURRENT_CAMPUS}**")
+
 col1, col2 = st.columns([8, 2])
-with col1: st.title("📊 JEET 죽전캠퍼스 성적 통합 관리 시스템")
+with col1: 
+    # [수정] 접속 주소에 맞는 대시보드 메인 한글 타이틀 자동 연동 변경
+    st.title(CAMPUS_CFG["title_text"])
 with col2: 
-    if os.path.exists("logo.png"): st.image("logo.png", width=150)
+    logo_file = CAMPUS_CFG["logo_file"]
+    if os.path.exists(logo_file): st.image(logo_file, width=150)
 
 try:
     df_info_all, df_results_all = fetch_all_dataframes()
@@ -682,7 +727,7 @@ with tab1:
                     for q_num in question_numbers:
                         new_record[str(q_num)] = 1 if answers[str(q_num)] > 0 else 0
 
-                    supabase = init_supabase()
+                    # [수정] 글로벌 변수 supabase 객체를 동적으로 즉시 사용하도록 수정
                     supabase.table("student_results").insert(new_record).execute()
                     
                     st.cache_data.clear() 
@@ -787,7 +832,6 @@ with tab4:
                 actual_q_cols = [col for col in filtered_df.columns if col.isdigit() and int(col) <= 50]
                 actual_q_cols = sorted(actual_q_cols, key=lambda x: int(x))
                 
-            # 반 리스트 추출하여 요약 안내 문구 노출
             available_classes = filtered_df['반'].astype(str).str.strip().replace({'0':'미지정','0.0':'미지정','nan':'미지정','':'미지정'}).unique().tolist()
             
             st.success(f"🎯 [{excel_quarter}] 재원생 총 {len(filtered_df)}명 확인 완료! 추출되는 반 탭 목록: {', '.join([f'[{c}]' for c in sorted(available_classes)])}")
