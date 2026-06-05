@@ -763,48 +763,99 @@ with tab2:
 
 # --- Tab 3: 반별 일괄 리포트 출력 ---
 with tab3:
-    st.subheader(f"[{selected_test}] 반별 전체 심층 분석 일괄 출력")
+    st.subheader("📅 분기별/반별 전체 심층 분석 일괄 출력")
     
-    if '반' in df_results_all.columns:
-        all_classes = df_results_all['반'].astype(str).str.strip().unique().tolist()
-        class_list = sorted([c for c in all_classes if c and c != '0' and c != 'nan'])
+    # 1. 데이터베이스에 '분기' 컬럼 유무 확인 후 분기 리스트 동적 추출
+    if '분기' in df_results_all.columns and not df_results_all.empty:
+        all_quarters = df_results_all['분기'].astype(str).str.strip().unique().tolist()
+        quarter_list = sorted([q for q in all_quarters if q and q not in ['0', '0.0', 'nan', 'None', '']], reverse=True)
         
-        if class_list:
-            target_class = st.selectbox("📌 출력할 반을 선택하세요:", class_list)
-            students_in_class = df_results_all[
-                (df_results_all['시험명'] == selected_test) & 
-                (df_results_all['반'].astype(str).str.strip() == target_class)
-            ]['이름'].astype(str).str.strip().unique().tolist()
-            students_in_class = sorted([s for s in students_in_class if s and s != '0' and s != 'nan'])
+        if quarter_list:
+            # 원장님이 분기를 먼저 직관적으로 선택
+            selected_quarter = st.selectbox("📅 출력할 분기를 선택하세요:", quarter_list, key="batch_quarter_select")
             
-            if students_in_class:
-                selected_students = st.multiselect(
-                    "👇 출력할 학생을 선택하세요 (제외할 학생의 'X'를 누르세요):", 
-                    options=students_in_class, 
-                    default=students_in_class
+            # 선택한 분기에 해당하는 데이터만 1차 필터링
+            df_quarter_filtered = df_results_all[df_results_all['분기'].astype(str).str.strip() == selected_quarter]
+            
+            # 2. 해당 분기 내에 등록된 '시험명(과정)' 리스트 동적 추출
+            all_tests_in_quarter = df_quarter_filtered['시험명'].astype(str).str.strip().unique().tolist()
+            test_list_batch = sorted([t for t in all_tests_in_quarter if t and t not in ['0', 'nan', 'None', '']])
+            
+            if test_list_batch:
+                selected_test_batch = st.selectbox(
+                    f"📝 [{selected_quarter}]의 시험 과정을 선택하세요:", 
+                    test_list_batch, 
+                    key="batch_test_select_under_quarter"
                 )
+                
+                # 분기 + 시험과정으로 2차 필터링 완료된 데이터셋 생성
+                df_final_filtered = df_quarter_filtered[df_quarter_filtered['시험명'].astype(str).str.strip() == selected_test_batch]
+                
+                # 3. 2차 필터링된 데이터셋 내에서만 '반' 목록 추출 (분기별 분할 완벽 지원)
+                all_classes = df_final_filtered['반'].astype(str).str.strip().unique().tolist()
+                class_list = sorted([c for c in all_classes if c and c not in ['0', '0.0', 'nan', 'None', '']])
+                
+                if class_list:
+                    target_class = st.selectbox("📌 출력할 반을 선택하세요:", class_list, key="batch_class_select")
+                    
+                    # 4. 해당 분기, 시험, 반에 정확히 포진한 학생 목록 추출
+                    students_in_class = df_final_filtered[
+                        df_final_filtered['반'].astype(str).str.strip() == target_class
+                    ]['이름'].astype(str).str.strip().unique().tolist()
+                    students_in_class = sorted([s for s in students_in_class if s and s not in ['0', 'nan', 'None', '']])
+                    
+                    if students_in_class:
+                        selected_students = st.multiselect(
+                            "👇 출력할 학생을 선택하세요 (제외할 학생의 'X'를 누르세요):", 
+                            options=students_in_class, 
+                            default=students_in_class,
+                            key="batch_student_select"
+                        )
+                    else:
+                        st.warning(f"⚠ [{selected_quarter} - {selected_test_batch}] 과정의 '{target_class}' 반에 학생 데이터가 존재하지 않습니다.")
+                        selected_students = []
+                else:
+                    st.warning(f"⚠ [{selected_quarter} - {selected_test_batch}] 과정에 배정 및 등록된 반 이름이 확인되지 않습니다.")
+                    target_class = st.text_input("출력할 반 이름 직접 입력:", placeholder="예: S반", key="batch_class_custom")
+                    selected_students = None
             else:
-                st.warning(f"⚠ 현재 선택하신 '{selected_test}' 과정에 '{target_class}' 학생 데이터가 없습니다.")
-                selected_students = []
+                st.warning(f"⚠ 선택하신 분기 [{selected_quarter}]로 등록된 시험 과정 데이터가 전무합니다.")
+                target_class = ""
+                selected_students = None
+                selected_test_batch = ""
         else:
-            st.info("DB에 아직 입력된 '반' 데이터가 없습니다.")
-            target_class = st.text_input("출력할 반 이름 직접 입력:", placeholder="예: S반")
+            st.warning("⚠ 성적 데이터베이스에 분석 가능한 분기 명칭이 존재하지 않습니다.")
+            target_class = ""
             selected_students = None
+            selected_test_batch = ""
     else:
-        st.warning("⚠ DB에 '반' 컬럼이 없어 수동으로 입력해야 합니다.")
-        target_class = st.text_input("출력할 반 이름 직접 입력:", placeholder="예: S반")
+        st.warning("⚠ 성적 데이터베이스가 비어 있거나 시스템 내부의 '분기' 필드를 탐색할 수 없습니다.")
+        target_class = ""
         selected_students = None
+        selected_test_batch = ""
 
-    if st.button("반 전체/선택 일괄 생성 (ZIP)", type="primary"):
-        if not target_class.strip(): st.error("반 이름을 입력하거나 선택해주세요.")
-        elif selected_students is not None and len(selected_students) == 0: st.error("출력할 학생을 최소 1명 이상 선택해주세요.")
+    # 일괄 압축 배포 및 파일 세이브 처리단
+    if st.button("반 전체/선택 일괄 생성 (ZIP)", type="primary", key="batch_zip_btn"):
+        if not target_class or not target_class.strip(): 
+            st.error("반 이름을 올바르게 선택하거나 기입해 주십시오.")
+        elif not selected_test_batch:
+            st.error("처리 대상 시험 과정이 명확하게 지정되지 않았습니다.")
+        elif selected_students is not None and len(selected_students) == 0: 
+            st.error("리포트 파일을 출력할 대상을 최소 한 명 이상 필터링해 주세요.")
         else:
-            with st.spinner(f"리포트를 하나의 압축 파일로 모으는 중입니다. 잠시만 기다려주세요..."):
-                success, buf, msg = generate_batch_report(target_class, selected_test, selected_students)
+            with st.spinner(f"[{selected_quarter} - {selected_test_batch}] '{target_class}' 반 리포트를 고화질 파일로 패키징 중입니다..."):
+                # 기존에 설계된 백엔드 비즈니스 로직 함수 완벽 호환 보존 호출
+                success, buf, msg = generate_batch_report(target_class, selected_test_batch, selected_students)
                 if success:
                     st.success(msg)
-                    st.download_button("📥 일괄 다운로드 (ZIP)", buf.getvalue(), f"{target_class}_리포트_모음.zip", "application/zip")
-                else: st.error(msg)
+                    st.download_button(
+                        label="📥 일괄 다운로드 (ZIP)", 
+                        data=buf.getvalue(), 
+                        file_name=f"{selected_quarter}_{selected_test_batch}_{target_class}_리포트_패키지.zip", 
+                        mime="application/zip"
+                    )
+                else: 
+                    st.error(msg)
 
 # --- Tab 4: 분기별 엑셀 추출 ---
 with tab4:
