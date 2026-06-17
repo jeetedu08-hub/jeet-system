@@ -453,7 +453,7 @@ def generate_jeet_expert_report(target_name, selected_test):
         img_buffer = io.BytesIO()
         
         for _, s_row in df_results.iterrows():
-for _, s_row in df_results.iterrows():
+        for _, s_row in df_results.iterrows():
             
             # DB 이름과 검색어에서 모든 공백 제거 및 대문자화
             db_name = str(s_row.get('이름', '')).replace(" ", "").strip().upper()
