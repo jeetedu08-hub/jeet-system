@@ -102,10 +102,15 @@ except Exception as e:
 @st.cache_data(ttl=1)
 def fetch_all_dataframes():
     # 동적으로 선택된 supabase 객체를 기반으로 조회 진행
-    info_res = supabase.table("test_info").select("*").execute()
+    
+    # 💡 수정 전: info_res = supabase.table("test_info").select("*").execute()
+    # 💡 수정 후: 넉넉하게 1만 줄까지 가져오도록 변경
+    info_res = supabase.table("test_info").select("*").limit(10000).execute()
     df_info = pd.DataFrame(info_res.data)
     
-    results_res = supabase.table("student_results").select("*").execute()
+    # 💡 수정 전: results_res = supabase.table("student_results").select("*").execute()
+    # 💡 수정 후: 여기도 1만 줄로 늘려줍니다.
+    results_res = supabase.table("student_results").select("*").limit(10000).execute()
     df_results = pd.DataFrame(results_res.data)
     
     if not df_results.empty:
