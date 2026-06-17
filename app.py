@@ -449,11 +449,12 @@ def prepare_report_data(selected_test):
 def generate_jeet_expert_report(target_name, selected_test):
     try:
         df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary = prepare_report_data(selected_test)
+# 이 위쪽 코드들과 줄 맞춤(세로 선)이 같아야 합니다.
         student_found = False
         img_buffer = io.BytesIO()
         
         for _, s_row in df_results.iterrows():
-        for _, s_row in df_results.iterrows():
+            # 💡 여기서부터는 for문 안쪽이므로 '스페이스바 4칸' 또는 '탭(Tab) 1번'이 들어가야 합니다.
             
             # DB 이름과 검색어에서 모든 공백 제거 및 대문자화
             db_name = str(s_row.get('이름', '')).replace(" ", "").strip().upper()
@@ -462,6 +463,9 @@ def generate_jeet_expert_report(target_name, selected_test):
             # 비교 로직 업데이트
             if not db_name or db_name == '0' or db_name != search_name:
                 continue
+                
+            # (이 아래로는 원래 있던 리포트 생성 코드가 이어지면 됩니다. 
+            #  이 아래 코드들도 당연히 if나 for문에 맞게 들여쓰기가 되어있어야 합니다.)
                 
             student_found = True
             student_grade = s_row.get('학년', '')
