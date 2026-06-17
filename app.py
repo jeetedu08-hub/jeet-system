@@ -183,32 +183,32 @@ def fetch_all_dataframes():
 
 # --- 3. 공통 그래프 그리기 함수 ---
 def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order):
+    # 테두리 설정
     border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
     fig.patches.append(border)
 
-    # [수정] 캠퍼스별 맞춤 로고 이미지 자동 처리
+    # 로고 위치 조정 (y=0.88로 설정하여 제목과 높이 맞춤)
     logo_file = CAMPUS_CFG["logo_file"]
     if os.path.exists(logo_file):
         logo_img = plt.imread(logo_file)
-        logo_img_axes = fig.add_axes([0.80, 0.915, 0.15, 0.045], zorder=15)
+        # 로고를 오른쪽 상단에 확실하게 배치
+        logo_img_axes = fig.add_axes([0.78, 0.88, 0.15, 0.06], zorder=15)
         logo_img_axes.imshow(logo_img)
         logo_img_axes.axis('off')
 
-    txt_jeet = fig.text(0.31, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
-    txt_title = fig.text(0.33, 0.88, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
+    # 제목 텍스트 위치 조정 (y=0.90 -> 0.88로 로고와 동일 선상)
+    txt_jeet = fig.text(0.30, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
+    txt_title = fig.text(0.32, 0.88, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
     
+    # 나머지 정보는 y=0.84로 기존 유지
     student_class = str(s_row.get('반', '')).strip()
     student_quarter = str(s_row.get('분기', '')).strip()
-    
     class_text = f"{student_class} | " if student_class and student_class != '0' and student_class != '0.0' else ""
     quarter_text = f" [{student_quarter}]" if student_quarter and student_quarter != '0' and student_quarter != '0.0' else ""
-    
     info_text = f"학교: {s_row.get('학교', '')} | 학년: {student_grade} | {class_text}이름: {student_name} | 과정: {selected_test}{quarter_text}"
     txt_info = fig.text(0.5, 0.84, info_text, ha='center', fontsize=12, fontweight='bold', color='#222')
-
-    txt_jeet.set_path_effects([path_effects.withStroke(linewidth=2, foreground=COLOR_RED)])
-    txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
-    txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
+    
+    # ... (이후 그래프 그리는 코드는 그대로 두셔도 됩니다) ...
 
     # --- 방사형 그래프 ---
     ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
@@ -523,7 +523,7 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
             class_students = class_students[class_students['이름'].astype(str).str.strip().isin(cleaned_selected)]
         
         if class_students.empty:
-            return False, None, f"선택된 학생 데이터가 없습니다. (이름 공백/오타 확인 필요)"
+            return False, None, f"선택된 학생 데이터가 없습니다."
             
         zip_buffer = io.BytesIO()
         
@@ -538,29 +538,32 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                 student_answers = []
                 for q in analysis['문항번호']:
                     val = s_row.get(str(q), None)
-                    if isinstance(val, pd.Series):
-                        val = val.iloc[0]
+                    if isinstance(val, pd.Series): val = val.iloc[0]
                     student_answers.append(safe_to_binary(val) if val is not None else 0)
-                    
+                
                 analysis['정답여부'] = student_answers
                 analysis['득점'] = analysis['정답여부'] * analysis['배점']
-                
                 cat_ratio = (analysis.groupby('영역')['득점'].sum() / analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
                 unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
                 unit_data = unit_data.reindex(unit_order).fillna(0)
 
-                fig = plt.figure(figsize=(8.27, 11.69))
+                # --- 여기서부터 수정된 루프 ---
+                fig = plt.figure(figsize=(8.27, 11.69), dpi=300)
                 draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
                 
                 temp_img_buffer = io.BytesIO()
-                fig.savefig(temp_img_buffer, format='png', dpi=300, bbox_inches='tight')
-                plt.close(fig)
+                # 세로 방향(portrait) 강제 지정
+                fig.savefig(temp_img_buffer, format='png', dpi=300, bbox_inches='tight', orientation='portrait')
+                
+                # 메모리에서 figure를 확실하게 제거
+                plt.close(fig) 
+                # --- 여기까지 ---
                 
                 file_name = f"{student_name}_리포트.png"
                 zip_file.writestr(file_name, temp_img_buffer.getvalue())
             
         zip_buffer.seek(0)
-        return True, zip_buffer, f"'{target_class}' 반 총 {len(class_students)}명의 리포트 일괄 생성 완료!"
+        return True, zip_buffer, f"'{target_class}' 반 리포트 일괄 생성 완료!"
     except Exception as e: return False, None, f"오류 발생: {traceback.format_exc()}"
 
 
