@@ -214,12 +214,6 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
 
     # --- (이후 그래프 그리는 코드는 동일) ---
-    # (나머지 코드들을 그대로 붙여넣으세요)
-
-    # 그림자/효과 적용
-    txt_jeet.set_path_effects([path_effects.withStroke(linewidth=2, foreground=COLOR_RED)])
-    txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
-    txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
     
     # --- 이후 그래프 및 진단 내용 코드는 기존과 동일하게 유지 ---
 
