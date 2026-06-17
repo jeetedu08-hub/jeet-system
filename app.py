@@ -453,8 +453,15 @@ def generate_jeet_expert_report(target_name, selected_test):
         img_buffer = io.BytesIO()
         
         for _, s_row in df_results.iterrows():
-            student_name = str(s_row.get('이름', '')).strip()
-            if not student_name or student_name == '0' or student_name != str(target_name).strip(): continue
+for _, s_row in df_results.iterrows():
+            
+            # DB 이름과 검색어에서 모든 공백 제거 및 대문자화
+            db_name = str(s_row.get('이름', '')).replace(" ", "").strip().upper()
+            search_name = str(target_name).replace(" ", "").strip().upper()
+            
+            # 비교 로직 업데이트
+            if not db_name or db_name == '0' or db_name != search_name:
+                continue
                 
             student_found = True
             student_grade = s_row.get('학년', '')
