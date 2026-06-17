@@ -183,38 +183,37 @@ def fetch_all_dataframes():
 
 # --- 3. 공통 그래프 그리기 함수 ---
 def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order):
-    # 1. 빨간 테두리
+    fig.clf() 
     border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
     fig.patches.append(border)
 
-    # 2. 로고 배치 (오른쪽 상단 구석)
+    # [1] 로고 위치 (현재 위치 유지: 우측 상단)
     logo_file = CAMPUS_CFG["logo_file"]
     if os.path.exists(logo_file):
         logo_img = plt.imread(logo_file)
-        # 로고가 제목과 겹치지 않게 오른쪽으로 밀어냅니다.
-        logo_img_axes = fig.add_axes([0.80, 0.90, 0.14, 0.06], zorder=15)
+        logo_img_axes = fig.add_axes([0.78, 0.90, 0.15, 0.06], zorder=15)
         logo_img_axes.imshow(logo_img)
         logo_img_axes.axis('off')
 
-    # 3. 제목 및 텍스트 (왼쪽 정렬)
-    txt_jeet = fig.text(0.20, 0.92, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
-    txt_title = fig.text(0.22, 0.92, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
+    # [2] [수정] 제목 배치: 화면의 중앙(x=0.5)으로 정렬
+    # JEET와 수학 능력 분석 리포트를 한 덩어리로 묶어 가운데 배치
+    txt_title = fig.text(0.5, 0.92, 'JEET 수학 능력 분석 리포트', fontsize=36, fontweight='bold', color=COLOR_NAVY, ha='center', va='center')
     
-    # 4. [수정] 학생 정보 텍스트 굵게(bold) 변경
+    # [3] [수정] 학생 정보 텍스트: 제목 바로 아래 중앙(x=0.5, y=0.86)으로 이동 & 굵게
     student_class = str(s_row.get('반', '')).strip()
     student_quarter = str(s_row.get('분기', '')).strip()
     class_text = f"{student_class} | " if student_class and student_class != '0' and student_class != '0.0' else ""
     quarter_text = f" [{student_quarter}]" if student_quarter and student_quarter != '0' and student_quarter != '0.0' else ""
     info_text = f"학교: {s_row.get('학교', '')} | 학년: {student_grade} | {class_text}이름: {student_name} | 과정: {selected_test}{quarter_text}"
     
-    # fontweight='bold'로 변경하여 굵게 처리
-    txt_info = fig.text(0.5, 0.86, info_text, ha='center', fontsize=12, fontweight='bold', color='#222')
+    # 굵게(bold) 적용 및 위치 중앙 정렬
+    txt_info = fig.text(0.5, 0.86, info_text, ha='center', fontsize=13, fontweight='bold', color='#222')
 
-    txt_jeet.set_path_effects([path_effects.withStroke(linewidth=2, foreground=COLOR_RED)])
+    # 효과 적용
     txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
     txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
 
-    # --- 이하 그래프 생성 로직은 동일합니다 (내용 생략) ---
+    # --- (이후 그래프 그리는 코드는 동일) ---
     # (나머지 코드들을 그대로 붙여넣으세요)
 
     # 그림자/효과 적용
