@@ -183,32 +183,39 @@ def fetch_all_dataframes():
 
 # --- 3. 공통 그래프 그리기 함수 ---
 def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order):
-    # 테두리 설정
+    # 1. 빨간 테두리 (기존 유지)
     border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
     fig.patches.append(border)
 
-    # 로고 위치 조정 (y=0.88로 설정하여 제목과 높이 맞춤)
+    # 2. [수정] 캠퍼스 로고 배치 (테두리에서 살짝 띄우고 오른쪽 끝으로)
     logo_file = CAMPUS_CFG["logo_file"]
     if os.path.exists(logo_file):
         logo_img = plt.imread(logo_file)
-        # 로고를 오른쪽 상단에 확실하게 배치
-        logo_img_axes = fig.add_axes([0.78, 0.88, 0.15, 0.06], zorder=15)
+        # x=0.81로 밀어서 제목과 겹치지 않게, y=0.91로 테두리(0.98) 아래에 배치
+        logo_img_axes = fig.add_axes([0.81, 0.91, 0.14, 0.05], zorder=15)
         logo_img_axes.imshow(logo_img)
         logo_img_axes.axis('off')
 
-    # 제목 텍스트 위치 조정 (y=0.90 -> 0.88로 로고와 동일 선상)
-    txt_jeet = fig.text(0.30, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
-    txt_title = fig.text(0.32, 0.88, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
+    # 3. [수정] 제목 및 JEET 텍스트 (왼쪽 정렬로 변경하여 로고와 거리 확보)
+    # y=0.91로 로고와 높이를 맞추고 x=0.07부터 시작
+    txt_jeet = fig.text(0.07, 0.91, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='left')
+    txt_title = fig.text(0.20, 0.91, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
     
-    # 나머지 정보는 y=0.84로 기존 유지
+    # 4. 학생 정보 라인 (y=0.86으로 살짝 내림)
     student_class = str(s_row.get('반', '')).strip()
     student_quarter = str(s_row.get('분기', '')).strip()
     class_text = f"{student_class} | " if student_class and student_class != '0' and student_class != '0.0' else ""
     quarter_text = f" [{student_quarter}]" if student_quarter and student_quarter != '0' and student_quarter != '0.0' else ""
     info_text = f"학교: {s_row.get('학교', '')} | 학년: {student_grade} | {class_text}이름: {student_name} | 과정: {selected_test}{quarter_text}"
-    txt_info = fig.text(0.5, 0.84, info_text, ha='center', fontsize=12, fontweight='bold', color='#222')
     
-    # ... (이후 그래프 그리는 코드는 그대로 두셔도 됩니다) ...
+    txt_info = fig.text(0.5, 0.86, info_text, ha='center', fontsize=12, fontweight='bold', color='#222')
+
+    # 그림자/효과 적용
+    txt_jeet.set_path_effects([path_effects.withStroke(linewidth=2, foreground=COLOR_RED)])
+    txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
+    txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
+    
+    # --- 이후 그래프 및 진단 내용 코드는 기존과 동일하게 유지 ---
 
     # --- 방사형 그래프 ---
     ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
@@ -531,7 +538,6 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
             for _, s_row in class_students.iterrows():
                 student_name = str(s_row.get('이름', '')).strip()
                 if not student_name or student_name == '0': continue
-                    
                 student_grade = s_row.get('학년', '')
                 
                 analysis = df_info.copy()
@@ -547,17 +553,17 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                 unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
                 unit_data = unit_data.reindex(unit_order).fillna(0)
 
-                # --- 여기서부터 수정된 루프 ---
+                # [수정] 신규 그래프 객체 생성 (A4 세로 비율)
                 fig = plt.figure(figsize=(8.27, 11.69), dpi=300)
                 draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
                 
                 temp_img_buffer = io.BytesIO()
-                # 세로 방향(portrait) 강제 지정
+                # [수정] 세로 방향 강제 고정 및 저장
                 fig.savefig(temp_img_buffer, format='png', dpi=300, bbox_inches='tight', orientation='portrait')
                 
-                # 메모리에서 figure를 확실하게 제거
-                plt.close(fig) 
-                # --- 여기까지 ---
+                # [수정] 메모리 정리 (겹침 방지 핵심)
+                plt.clf()
+                plt.close(fig)
                 
                 file_name = f"{student_name}_리포트.png"
                 zip_file.writestr(file_name, temp_img_buffer.getvalue())
