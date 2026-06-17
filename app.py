@@ -394,8 +394,13 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
 def prepare_report_data(selected_test):
     df_info, df_results = fetch_all_dataframes()
     
-    df_info = df_info[df_info['시험명'] == selected_test].copy()
-    df_results = df_results[df_results['시험명'] == selected_test].copy()
+    selected_test_clean = str(selected_test).strip()
+    
+    df_info['시험명_정제'] = df_info['시험명'].astype(str).str.strip()
+    df_results['시험명_정제'] = df_results['시험명'].astype(str).str.strip()
+    
+    df_info = df_info[df_info['시험명_정제'] == selected_test_clean].copy()
+    df_results = df_results[df_results['시험명_정제'] == selected_test_clean].copy()
     
     df_info['배점'] = pd.to_numeric(df_info['배점'], errors='coerce').fillna(3).astype(int)
     df_info['단원'] = df_info['단원'].astype(str).str.strip()
