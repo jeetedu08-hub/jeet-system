@@ -464,13 +464,14 @@ def generate_jeet_expert_report(target_name, selected_test):
         img_buffer = io.BytesIO()
         
         for _, s_row in df_results.iterrows():
-            # 💡 여기서부터는 for문 안쪽이므로 '스페이스바 4칸' 또는 '탭(Tab) 1번'이 들어가야 합니다.
+            # 1. 리포트 출력용 원본 이름 (오류가 났던 부분 복구!)
+            student_name = str(s_row.get('이름', '')).strip()
             
-            # DB 이름과 검색어에서 모든 공백 제거 및 대문자화
-            db_name = str(s_row.get('이름', '')).replace(" ", "").strip().upper()
+            # 2. 검색 비교용 텍스트 (공백 모두 제거 및 대문자화)
+            db_name = student_name.replace(" ", "").upper()
             search_name = str(target_name).replace(" ", "").strip().upper()
             
-            # 비교 로직 업데이트
+            # 3. 띄어쓰기 무시하고 일치하는지 비교
             if not db_name or db_name == '0' or db_name != search_name:
                 continue
                 
