@@ -483,18 +483,19 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
             )
             fig.lines.append(sep)
 
-        # ── 태그 배지 ─────────────────────────────────────────
-        tag_w = len(tag) * (fs_tag / 72 * 1.1) / fig_width_inch + 0.018
-        badge = mpatches.FancyBboxPatch(
-            (CL, curr_y - TAG_H * 0.85), tag_w, TAG_H,
-            boxstyle="round,pad=0.002",
-            facecolor=tag_bg, edgecolor=tag_color, linewidth=0.9,
-            transform=fig.transFigure, zorder=2
+        # ── 태그 배지: bbox 속성으로 텍스트 크기에 딱 맞게 자동 생성 ─
+        fig.text(
+            CL, curr_y - TAG_H * 0.35,
+            tag,
+            fontsize=fs_tag, fontweight='bold', color=tag_color,
+            va='center', ha='left', zorder=3,
+            bbox=dict(
+                boxstyle='round,pad=0.25',
+                facecolor=tag_bg,
+                edgecolor=tag_color,
+                linewidth=0.9,
+            )
         )
-        fig.patches.append(badge)
-        fig.text(CL + 0.006, curr_y - TAG_H * 0.85 + TAG_H * 0.5,
-                 tag, fontsize=fs_tag, fontweight='bold', color=tag_color,
-                 va='center', zorder=3)
 
         curr_y -= TAG_H + TAG_MGAP
 
