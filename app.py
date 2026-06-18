@@ -225,30 +225,30 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
     ax1.set_theta_direction(-1)
     ax1.set_theta_offset(np.pi / 2.0)
 
-    # ── 학생: 파랑 실선 + 반투명 채우기 ───────────────────────
+    # ── 학생: 파랑 실선(-) + 진한 채우기 ─────────────────────
     s_raw    = s_ordered.values.tolist()
     s_scaled = scale_list(s_raw) + [scale_to_display(s_raw[0])]
     ax1.plot(angles, s_scaled,
-             color=COLOR_RADAR_STUDENT, linewidth=1.8, linestyle='-', zorder=4,
+             color=COLOR_RADAR_STUDENT, linewidth=2.2, linestyle='-', zorder=4,
              label='학생 점수')
-    ax1.fill(angles, s_scaled, color=COLOR_RADAR_STUDENT, alpha=0.30, zorder=3)
+    ax1.fill(angles, s_scaled, color=COLOR_RADAR_STUDENT, alpha=0.28, zorder=3)
 
-    # ── 시험지 전체 평균: 초록 실선 + 채우기 ───────────────────
+    # ── 시험지 전체 평균: 초록 파선(--) + 채우기 ──────────────
     avg_raw    = avg_cat_ratio.reindex(ordered_labels).fillna(0).values.tolist()
     avg_scaled = scale_list(avg_raw) + [scale_to_display(avg_raw[0])]
     ax1.plot(angles, avg_scaled,
-             color=COLOR_RADAR_AVG, linewidth=1.8, linestyle='-', zorder=4,
+             color=COLOR_RADAR_AVG, linewidth=1.8, linestyle='--', dashes=(5, 3), zorder=4,
              label='시험지 평균')
-    ax1.fill(angles, avg_scaled, color=COLOR_RADAR_AVG, alpha=0.15, zorder=2)
+    ax1.fill(angles, avg_scaled, color=COLOR_RADAR_AVG, alpha=0.13, zorder=2)
 
-    # ── 같은 반 평균: 주황 실선 + 채우기 ──────────────────────
+    # ── 같은 반 평균: 주황 일점쇄선(-.) + 채우기 ─────────────
     if class_cat_ratio is not None:
         cls_raw    = class_cat_ratio.reindex(ordered_labels).fillna(0).values.tolist()
         cls_scaled = scale_list(cls_raw) + [scale_to_display(cls_raw[0])]
         ax1.plot(angles, cls_scaled,
-                 color=COLOR_RADAR_UNIT, linewidth=1.8, linestyle='-', zorder=4,
+                 color=COLOR_RADAR_UNIT, linewidth=1.8, linestyle='-.', zorder=4,
                  label='같은 반 평균')
-        ax1.fill(angles, cls_scaled, color=COLOR_RADAR_UNIT, alpha=0.15, zorder=1)
+        ax1.fill(angles, cls_scaled, color=COLOR_RADAR_UNIT, alpha=0.13, zorder=1)
 
     ax1_limit = max(50, min(115, max(s_scaled) + 10))
     ax1.set_ylim(0, ax1_limit)
@@ -344,37 +344,39 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
     title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
 
     # ══════════════════════════════════════════════════════════
-    # ▶ 하단 심층 분석 박스 — 3섹션 세련된 구분 + 오버플로 방지
+    # ▶ 하단 심층 분석 박스
     # ══════════════════════════════════════════════════════════
     BOX_LEFT   = 0.05
     BOX_RIGHT  = 0.95
-    BOX_TOP    = 0.465
-    BOX_BOTTOM = 0.115
+    BOX_TOP    = 0.470
+    BOX_BOTTOM = 0.110
 
+    # 외곽 박스
     rect_diag = plt.Rectangle(
         (BOX_LEFT, BOX_BOTTOM),
         BOX_RIGHT - BOX_LEFT, BOX_TOP - BOX_BOTTOM,
-        fill=True, facecolor='#F0F2F8',
+        fill=True, facecolor='#F5F6FA',
         edgecolor='#B0BEC5', linewidth=1.2,
         transform=fig.transFigure, zorder=0
     )
     fig.patches.append(rect_diag)
 
     # 헤더 타이틀 바
+    HDR_H = 0.032
     header_rect = plt.Rectangle(
-        (BOX_LEFT, BOX_TOP - 0.038),
-        BOX_RIGHT - BOX_LEFT, 0.038,
+        (BOX_LEFT, BOX_TOP - HDR_H),
+        BOX_RIGHT - BOX_LEFT, HDR_H,
         fill=True, facecolor=COLOR_NAVY,
         transform=fig.transFigure, zorder=1
     )
     fig.patches.append(header_rect)
-    fig.text(0.50, BOX_TOP - 0.019,
+    fig.text(0.50, BOX_TOP - HDR_H / 2,
              f"JEET 중등 자사 센터  |  {student_name} 학생 심층 분석",
              ha='center', va='center',
-             fontsize=11, fontweight='bold', color='white', zorder=2)
+             fontsize=10.5, fontweight='bold', color='white', zorder=2)
 
     # ── 텍스트 내용 생성 ──────────────────────────────────────
-    u_res   = s_pct_raw          # 실제 점수(0~100) 기준으로 진단
+    u_res   = s_pct_raw
     avg_val = int(cat_ratio.mean())
 
     if avg_val >= 80:
@@ -384,7 +386,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
     elif avg_val >= 20:
         eval_tier = "핵심 개념을 정교하게 다듬어가는 과정에 있으며, 학습 잠재력이 점진적으로 발현되는 도약 단계의 성취를 보여줍니다. 꾸준한 학습 태도를 유지한다면 성취도 향상이 기대되는 상황"
     else:
-        eval_tier = "수학적 기초 체력을 보강하며 자신감을 쌓아가는 기틀 마련 단계의 성취를 보여줍니다. 학습적 결손을 메우고 성공적인 문제 풀이 경험을 축적하여 학습 동기를 부여하는 데 집중해야하는 시점"
+        eval_tier = "수학적 기초 체력을 보강하며 자신감을 쌓아가는 기틀 마련 단계의 성취를 보여줍니다. 학습적 결손을 메우고 성공적인 문제 풀이 경험을 축적하여 학습 동기를 부여하는 데 집중해야 하는 시점"
 
     diag_total = f"{student_name} 학생은 성취도 {avg_val}%를 기록하며, 현재 {eval_tier}입니다."
 
@@ -416,81 +418,97 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
     units_text = ', '.join([f'<{u}>' for u in weak_list]) if weak_list else "핵심"
 
     if avg_score >= 80:
-        sol_text = (f"{student_name} 학생은 훌륭한 성취를 보여주고 있습니다. JEET CARE+를 통해 고난도 사고력 문제를 즐길 수 있는 환경을 만들고, JDM으로 자기주도학습 습관을 형성하며 주말몰입수업으로 심화를 다지겠습니다.")
+        sol_text = f"{student_name} 학생은 훌륭한 성취를 보여주고 있습니다. JEET CARE+를 통해 고난도 사고력 문제를 즐길 수 있는 환경을 만들고, JDM으로 자기주도학습 습관을 형성하며 주말몰입수업으로 심화를 다지겠습니다."
     elif avg_score >= 50:
-        sol_text = (f"배운 내용을 자기 것으로 만드는 과정이 순조롭습니다. JEET CARE+를 통해 응용·심화 문제를 연습하고, JDM으로 자기주도학습 습관을 기르며 주말몰입수업으로 성취도를 끌어올리겠습니다.")
+        sol_text = f"배운 내용을 자기 것으로 만드는 과정이 순조롭습니다. JEET CARE+를 통해 응용·심화 문제를 연습하고, JDM으로 자기주도학습 습관을 기르며 주말몰입수업으로 성취도를 끌어올리겠습니다."
     elif avg_score >= 20:
-        sol_text = (f"지금은 한 단계 더 성장하기 위해 에너지를 모으는 시기입니다. {units_text} 단원을 JEET CARE+ 밀착 관리로 친숙한 개념으로 바꿔가겠습니다. JDM으로 자기주도학습 습관을 만들고 주말몰입수업으로 수학이 즐거운 과목이 되도록 지도하겠습니다.")
+        sol_text = f"지금은 한 단계 더 성장하기 위해 에너지를 모으는 시기입니다. {units_text} 단원을 JEET CARE+ 밀착 관리로 친숙한 개념으로 바꿔가겠습니다. JDM으로 자기주도학습 습관을 만들고 주말몰입수업으로 수학이 즐거운 과목이 되도록 지도하겠습니다."
     else:
-        sol_text = (f"기초를 단단히 다지는 것이 가장 확실한 성장의 길입니다. {units_text} 단원의 기초를 JEET CARE+와 JDM으로 다지며, 주말몰입수업과 눈높이 지도로 작은 노력이 큰 성취로 이어지도록 정성을 다하겠습니다.")
+        sol_text = f"기초를 단단히 다지는 것이 가장 확실한 성장의 길입니다. {units_text} 단원의 기초를 JEET CARE+와 JDM으로 다지며, 주말몰입수업과 눈높이 지도로 작은 노력이 큰 성취로 이어지도록 정성을 다하겠습니다."
 
-    # ── 박스 내 텍스트 레이아웃 계산 ─────────────────────────
-    # 가용 영역: x 0.07~0.93, y BOX_BOTTOM+0.01 ~ BOX_TOP-0.042
-    CONTENT_LEFT   = 0.07
-    CONTENT_RIGHT  = 0.93
-    CONTENT_TOP    = BOX_TOP - 0.048       # 헤더 바 아래
-    CONTENT_BOTTOM = BOX_BOTTOM + 0.008
+    # ── 레이아웃 상수 ─────────────────────────────────────────
+    # figure 좌표: 0.0 ~ 1.0 (A4 세로 기준 실측)
+    # 가용 콘텐츠 영역
+    CL = BOX_LEFT  + 0.022          # Content Left  (패딩)
+    CR = BOX_RIGHT - 0.022          # Content Right (패딩)
+    CT = BOX_TOP   - HDR_H - 0.010  # Content Top   (헤더 바 아래 + 여백)
+    CB = BOX_BOTTOM + 0.010         # Content Bottom
 
-    # 섹션당 태그 색상 및 배경 정의
+    # figure 좌표에서 텍스트 폰트 크기 환산:
+    # A4 세로(11.69인치) × dpi(300) ÷ 72 pt/inch = 1pt ≈ 0.000285 figure 단위
+    # 한글 폰트는 영문보다 약 1.5배 넓으므로 wrap 너비를 보수적으로 잡음
+    PT_TO_FIG = 1.0 / (11.69 * 72)   # 1pt → figure 단위 높이
+
     section_defs = [
         ("[종합 진단]",          diag_total,    '#1A237E', '#E8EAF6'),
         ("[영역별&단원별 분석]", diag_combined, '#1B5E20', '#E8F5E9'),
         ("[JEET 맞춤 솔루션]",   sol_text,      '#B71C1C', '#FFEBEE'),
     ]
 
-    # 전체 텍스트 길이에 따른 동적 폰트/줄바꿈 설정
+    # 전체 글자 수에 따라 폰트 크기 결정
     total_chars = sum(len(c) for _, c, _, _ in section_defs)
-    if total_chars > 700:
-        wrap_w, fs_tag, fs_body, line_h, sec_gap = 88, 7.5, 6.8, 0.0125, 0.006
-    elif total_chars > 500:
-        wrap_w, fs_tag, fs_body, line_h, sec_gap = 80, 8.0, 7.3, 0.0135, 0.008
+    if total_chars > 650:
+        fs_body = 6.5
+    elif total_chars > 450:
+        fs_body = 7.0
     else:
-        wrap_w, fs_tag, fs_body, line_h, sec_gap = 72, 8.5, 7.8, 0.0145, 0.010
+        fs_body = 7.5
+    fs_tag    = fs_body + 0.8
 
-    curr_y = CONTENT_TOP
+    # 줄 높이: 폰트 포인트 × 줄간격(1.55) → figure 단위
+    LINE_H    = fs_body * PT_TO_FIG * 1.55
+    TAG_H     = fs_tag  * PT_TO_FIG * 2.2   # 태그 배지 높이
+    TAG_MGAP  = fs_body * PT_TO_FIG * 0.9   # 태그~본문 간격
+    SEC_GAP   = fs_body * PT_TO_FIG * 2.0   # 섹션 간 간격
 
-    for tag, content, tag_color, tag_bg in section_defs:
-        if curr_y < CONTENT_BOTTOM + 0.03:
-            break   # 공간 초과 시 더 이상 그리지 않음
+    # figure 너비(8.27인치) 기준으로 한 줄에 들어갈 한글 글자 수 계산
+    # CL~CR 사이 인치 폭 / (글자 1개 인치 폭)
+    fig_width_inch  = 8.27
+    char_w_inch     = fs_body / 72 * 1.05   # 한글 약 1em 너비 (pt → inch × 여유)
+    avail_w_inch    = (CR - CL) * fig_width_inch
+    wrap_w          = max(30, int(avail_w_inch / char_w_inch))
 
-        # ── 태그 배경 캡슐 ────────────────────────────────────
-        tag_w  = len(tag) * 0.006 + 0.015
-        tag_rect = mpatches.FancyBboxPatch(
-            (CONTENT_LEFT, curr_y - 0.016), tag_w, 0.018,
-            boxstyle="round,pad=0.003",
-            facecolor=tag_bg, edgecolor=tag_color, linewidth=0.8,
+    curr_y = CT
+
+    for idx, (tag, content, tag_color, tag_bg) in enumerate(section_defs):
+        if curr_y < CB + TAG_H + LINE_H:
+            break
+
+        # ── 섹션 구분선 (첫 섹션 제외) ───────────────────────
+        if idx > 0 and curr_y < CT - 0.01:
+            sep = plt.Line2D(
+                [CL, CR], [curr_y + SEC_GAP * 0.3, curr_y + SEC_GAP * 0.3],
+                color='#C5CAE9', linewidth=0.7,
+                transform=fig.transFigure, zorder=2
+            )
+            fig.lines.append(sep)
+
+        # ── 태그 배지 ─────────────────────────────────────────
+        tag_w = len(tag) * (fs_tag / 72 * 1.1) / fig_width_inch + 0.018
+        badge = mpatches.FancyBboxPatch(
+            (CL, curr_y - TAG_H * 0.85), tag_w, TAG_H,
+            boxstyle="round,pad=0.002",
+            facecolor=tag_bg, edgecolor=tag_color, linewidth=0.9,
             transform=fig.transFigure, zorder=2
         )
-        fig.patches.append(tag_rect)
-        fig.text(CONTENT_LEFT + 0.007, curr_y - 0.005,
+        fig.patches.append(badge)
+        fig.text(CL + 0.006, curr_y - TAG_H * 0.85 + TAG_H * 0.5,
                  tag, fontsize=fs_tag, fontweight='bold', color=tag_color,
                  va='center', zorder=3)
 
-        curr_y -= 0.022   # 태그 아래 여백
+        curr_y -= TAG_H + TAG_MGAP
 
-        # ── 본문 텍스트 (줄바꿈 후 라인 단위 출력) ────────────
-        wrapped = textwrap.fill(content, width=wrap_w)
-        lines   = wrapped.split('\n')
-        for line in lines:
-            if curr_y < CONTENT_BOTTOM:
+        # ── 본문 텍스트 ───────────────────────────────────────
+        wrapped_lines = textwrap.fill(content, width=wrap_w).split('\n')
+        for line in wrapped_lines:
+            if curr_y < CB:
                 break
-            fig.text(CONTENT_LEFT, curr_y, line,
-                     fontsize=fs_body, color='#333333',
+            fig.text(CL, curr_y, line,
+                     fontsize=fs_body, color='#2C2C2C',
                      va='top', zorder=3)
-            curr_y -= line_h
+            curr_y -= LINE_H
 
-        curr_y -= sec_gap   # 섹션 간 여백
-
-        # ── 섹션 구분선 (마지막 섹션 제외) ───────────────────
-        if tag != "[JEET 맞춤 솔루션]" and curr_y > CONTENT_BOTTOM + 0.01:
-            sep_line = plt.Line2D(
-                [CONTENT_LEFT, CONTENT_RIGHT],
-                [curr_y + sec_gap * 0.5, curr_y + sec_gap * 0.5],
-                color='#CFD8DC', linewidth=0.8,
-                transform=fig.transFigure, zorder=2
-            )
-            fig.lines.append(sep_line)
-            curr_y -= sec_gap * 0.5
+        curr_y -= SEC_GAP
 
     # ── 하단 캠퍼스 안내 ──────────────────────────────────────
     line_footer = plt.Line2D([0.05, 0.95], [0.10, 0.10],
