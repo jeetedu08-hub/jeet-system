@@ -224,24 +224,33 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     max_s_val = max(s_vals) if len(s_vals) > 0 else 0
     ax1_limit = max(45, min(110, max_s_val + (max_s_val * 0.25) + 10))
     
+    # 0~100% 실제 점수를 20~100% 표시 범위로 변환 (기본값 20% 보장)
+    def scale_radar(raw_list):
+        return [20 + v * 0.8 for v in raw_list]
+
     ax1.set_theta_direction(-1); ax1.set_theta_offset(np.pi/2.0)
     # 학생: 굵은 빨강 실선 + 채우기
-    ax1.plot(angles, s_vals, color=COLOR_STUDENT, linewidth=3.0, linestyle='-', label='학생 점수')
-    ax1.fill(angles, s_vals, color=COLOR_STUDENT, alpha=0.15)
+    s_vals_scaled = scale_radar(s_vals[:-1]) + [scale_radar(s_vals[:-1])[0]]
+    ax1.plot(angles, s_vals_scaled, color=COLOR_STUDENT, linewidth=3.0, linestyle='-', label='학생 점수')
+    ax1.fill(angles, s_vals_scaled, color=COLOR_STUDENT, alpha=0.15)
 
     # 시험지 전체 평균: 파랑 굵은 파선
     avg_ordered = avg_cat_ratio.reindex(ordered_labels).fillna(0)
-    avg_vals = avg_ordered.values.tolist() + [avg_ordered.values[0]]
-    ax1.plot(angles, avg_vals, color=COLOR_AVG, linewidth=2.2, linestyle='--', label='시험지 평균')
-    ax1.fill(angles, avg_vals, color=COLOR_AVG, alpha=0.07)
+    avg_raw = avg_ordered.values.tolist()
+    avg_vals_scaled = scale_radar(avg_raw) + [scale_radar(avg_raw)[0]]
+    ax1.plot(angles, avg_vals_scaled, color=COLOR_AVG, linewidth=2.2, linestyle='--', label='시험지 평균')
+    ax1.fill(angles, avg_vals_scaled, color=COLOR_AVG, alpha=0.07)
 
-    # 같은 반 평균: 주황 점선 + 채우기
+    # 같은 반 평균: 주황 일점쇄선 + 채우기
     if class_cat_ratio is not None:
         cls_ordered = class_cat_ratio.reindex(ordered_labels).fillna(0)
-        cls_vals = cls_ordered.values.tolist() + [cls_ordered.values[0]]
-        ax1.plot(angles, cls_vals, color=COLOR_UNIT, linewidth=2.2, linestyle='-.', label='같은 반 평균')
-        ax1.fill(angles, cls_vals, color=COLOR_UNIT, alpha=0.07)
+        cls_raw = cls_ordered.values.tolist()
+        cls_vals_scaled = scale_radar(cls_raw) + [scale_radar(cls_raw)[0]]
+        ax1.plot(angles, cls_vals_scaled, color=COLOR_UNIT, linewidth=2.2, linestyle='-.', label='같은 반 평균')
+        ax1.fill(angles, cls_vals_scaled, color=COLOR_UNIT, alpha=0.07)
 
+    # ax1_limit을 변환된 값 기준으로 재계산 (최소 중심 20 확보)
+    ax1_limit = max(50, min(115, max(s_vals_scaled) + 10))
     ax1.set_ylim(0, ax1_limit); ax1.set_xticks(angles[:-1]); ax1.set_xticklabels([]); ax1.set_yticklabels([]) 
     
     for i in range(len(labels)):
