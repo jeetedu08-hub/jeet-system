@@ -36,9 +36,9 @@ plt.rcParams['axes.unicode_minus'] = False
 
 COLOR_NAVY = '#1A237E'
 COLOR_RED = '#D32F2F'
-COLOR_STUDENT = '#0056B3' 
-COLOR_UNIT = '#00796B'    
-COLOR_AVG = '#757575'
+COLOR_STUDENT = '#D32F2F'   # 학생: 강렬한 빨강
+COLOR_UNIT = '#F57C00'      # 같은 반 평균: 주황
+COLOR_AVG = '#1565C0'       # 시험지 전체 평균: 파랑
 COLOR_GRID = '#E0E0E0'
 COLOR_BG = '#F8F9FA'
 
@@ -225,19 +225,22 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     ax1_limit = max(45, min(110, max_s_val + (max_s_val * 0.25) + 10))
     
     ax1.set_theta_direction(-1); ax1.set_theta_offset(np.pi/2.0)
-    ax1.plot(angles, s_vals, color=COLOR_RED, linewidth=2.5, label='학생 점수')
-    ax1.fill(angles, s_vals, color=COLOR_RED, alpha=0.08)
+    # 학생: 굵은 빨강 실선 + 채우기
+    ax1.plot(angles, s_vals, color=COLOR_STUDENT, linewidth=3.0, linestyle='-', label='학생 점수')
+    ax1.fill(angles, s_vals, color=COLOR_STUDENT, alpha=0.15)
 
-    # 시험지 전체 평균 선
+    # 시험지 전체 평균: 파랑 굵은 파선
     avg_ordered = avg_cat_ratio.reindex(ordered_labels).fillna(0)
     avg_vals = avg_ordered.values.tolist() + [avg_ordered.values[0]]
-    ax1.plot(angles, avg_vals, color=COLOR_AVG, linewidth=1.8, linestyle='--', label='시험지 평균')
+    ax1.plot(angles, avg_vals, color=COLOR_AVG, linewidth=2.2, linestyle='--', label='시험지 평균')
+    ax1.fill(angles, avg_vals, color=COLOR_AVG, alpha=0.07)
 
-    # 같은 반 평균 선
+    # 같은 반 평균: 주황 점선 + 채우기
     if class_cat_ratio is not None:
         cls_ordered = class_cat_ratio.reindex(ordered_labels).fillna(0)
         cls_vals = cls_ordered.values.tolist() + [cls_ordered.values[0]]
-        ax1.plot(angles, cls_vals, color=COLOR_UNIT, linewidth=1.8, linestyle=':', label='같은 반 평균')
+        ax1.plot(angles, cls_vals, color=COLOR_UNIT, linewidth=2.2, linestyle='-.', label='같은 반 평균')
+        ax1.fill(angles, cls_vals, color=COLOR_UNIT, alpha=0.07)
 
     ax1.set_ylim(0, ax1_limit); ax1.set_xticks(angles[:-1]); ax1.set_xticklabels([]); ax1.set_yticklabels([]) 
     
@@ -254,8 +257,9 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
             
         ax1.text(angle, dist, label_text, fontsize=10, fontweight='bold', va=va, ha=ha, color=COLOR_NAVY)
 
-    # 범례
-    ax1.legend(loc='upper right', bbox_to_anchor=(1.35, 1.15), fontsize=7, framealpha=0.7)
+    # 범례 (색 패치 크게)
+    ax1.legend(loc='upper right', bbox_to_anchor=(1.35, 1.15), fontsize=7.5, framealpha=0.85,
+               handlelength=2.5, handleheight=1.2)
 
     title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
@@ -272,30 +276,32 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     max_b_val = s_pct.max() if not s_pct.empty else 0
     ax2_limit = max(40, min(110, max_b_val + (max_b_val * 0.25) + 15)) 
     
-    ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3, label='학생 점수')
+    # 학생 막대: 빨강
+    ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.85, width=bar_width, zorder=3, label='학생 점수')
 
-    # 시험지 전체 평균 선
+    # 시험지 전체 평균: 파랑 파선 + 원형 마커
     if unit_avg_data is not None and not unit_avg_data.empty:
-        avg_total = unit_avg_data.reindex(final_unit_data.index).fillna(0)
         avg_unit_pct = []
         for u in final_unit_data.index:
-            u_info_rows = unit_avg_data.loc[[u]] if u in unit_avg_data.index else None
-            # unit_avg_data에는 평균득점만 있으므로 배점은 unit_data에서 가져옴
             denom = final_unit_data.loc[u, '배점'] if u in final_unit_data.index else 0
             numer = unit_avg_data.loc[u, '평균득점'] if u in unit_avg_data.index else 0
             avg_unit_pct.append((numer / denom * 100) if denom > 0 else 0)
-        ax2.plot(x_pos, avg_unit_pct, color=COLOR_AVG, linewidth=1.8, linestyle='--', marker='o', markersize=4, zorder=4, label='시험지 평균')
+        ax2.plot(x_pos, avg_unit_pct, color=COLOR_AVG, linewidth=2.2, linestyle='--',
+                 marker='o', markersize=6, markerfacecolor='white', markeredgewidth=2,
+                 zorder=5, label='시험지 평균')
 
-    # 같은 반 평균 선
+    # 같은 반 평균: 주황 일점쇄선 + 다이아몬드 마커
     if class_unit_avg_data is not None and not class_unit_avg_data.empty:
         cls_unit_pct = []
         for u in final_unit_data.index:
             denom = final_unit_data.loc[u, '배점'] if u in final_unit_data.index else 0
             numer = class_unit_avg_data.loc[u, '평균득점'] if u in class_unit_avg_data.index else 0
             cls_unit_pct.append((numer / denom * 100) if denom > 0 else 0)
-        ax2.plot(x_pos, cls_unit_pct, color=COLOR_UNIT, linewidth=1.8, linestyle=':', marker='s', markersize=4, zorder=4, label='같은 반 평균')
+        ax2.plot(x_pos, cls_unit_pct, color=COLOR_UNIT, linewidth=2.2, linestyle='-.',
+                 marker='D', markersize=5, markerfacecolor='white', markeredgewidth=2,
+                 zorder=5, label='같은 반 평균')
 
-    ax2.legend(loc='upper right', fontsize=7, framealpha=0.7)
+    ax2.legend(loc='upper right', fontsize=7.5, framealpha=0.85, handlelength=2.5)
 
     ax2.set_xticks(x_pos)
     ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in final_unit_data.index], fontsize=8, fontweight='bold')
