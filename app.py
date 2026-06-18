@@ -183,6 +183,13 @@ def fetch_all_dataframes():
 
 # --- 3. 공통 그래프 그리기 함수 ---
 def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order):
+    # [방어 코드] 이전 figure 잔재(axes/patches/texts/lines) 완전 초기화
+    for ax in fig.axes:
+        fig.delaxes(ax)
+    fig.patches.clear()
+    fig.lines.clear()
+    fig.texts.clear()
+
     border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
     fig.patches.append(border)
 
@@ -499,11 +506,14 @@ def generate_jeet_expert_report(target_name, selected_test):
             unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
             unit_data = unit_data.reindex(unit_order).fillna(0)
 
-            fig = plt.figure(figsize=(8.27, 11.69))
+            plt.close('all')  # 이전 figure 잔재 완전 정리
+            fig = plt.figure(figsize=(8.27, 11.69), dpi=150)
+            fig.patch.set_facecolor('white')
             draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
             
-            fig.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
-            plt.close(fig)
+            fig.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight',
+                        facecolor='white', edgecolor='none')
+            plt.close('all')  # 저장 후 완전 정리
             break
             
         if not student_found: return False, None, "학생을 찾을 수 없습니다."
@@ -548,17 +558,18 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                 unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
                 unit_data = unit_data.reindex(unit_order).fillna(0)
 
-                # [수정] 신규 그래프 객체 생성 (A4 세로 비율)
-                fig = plt.figure(figsize=(8.27, 11.69), dpi=300)
+                # [수정] 이전 figure 완전 정리 후 새 figure 생성
+                plt.close('all')
+                fig = plt.figure(figsize=(8.27, 11.69), dpi=150)
+                fig.patch.set_facecolor('white')
                 draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
                 
                 temp_img_buffer = io.BytesIO()
-                # [수정] 세로 방향 강제 고정 및 저장
-                fig.savefig(temp_img_buffer, format='png', dpi=300, bbox_inches='tight', orientation='portrait')
+                fig.savefig(temp_img_buffer, format='png', dpi=150, bbox_inches='tight',
+                            facecolor='white', edgecolor='none')
                 
-                # [수정] 메모리 정리 (겹침 방지 핵심)
-                plt.clf()
-                plt.close(fig)
+                # [수정] 저장 후 완전 정리 (겹침 방지 핵심)
+                plt.close('all')
                 
                 file_name = f"{student_name}_리포트.png"
                 zip_file.writestr(file_name, temp_img_buffer.getvalue())
