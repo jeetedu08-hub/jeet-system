@@ -665,7 +665,13 @@ selected_test = st.sidebar.selectbox("분석할 시험 과정을 선택하세요
 df_info_filtered = df_info_all[df_info_all['시험명'] == selected_test]
 
 # 탭 선언
-tab1, tab2, tab3, tab4 = st.tabs(["✍️ 성적 입력", "📊 개별 리포트 출력", "📚 반별 일괄 리포트 출력", "🟢 분기별 엑셀 추출"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "✍️ 성적 입력", 
+    "📊 개별 리포트 출력", 
+    "📚 반별 일괄 리포트 출력", 
+    "🟢 분기별 엑셀 추출",
+    "✏️ 성적 수정/삭제"   # ← 추가
+])
 
 # --- Tab 1: 성적 입력 ---
 with tab1:
@@ -934,3 +940,205 @@ with tab4:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
+# --- Tab 5: 성적 수정/삭제 ---
+with tab5:
+    st.subheader("✏️ 학생 성적 수정 / 삭제")
+    st.markdown("검색 후 해당 학생의 성적을 수정하거나 레코드를 삭제할 수 있습니다.")
+
+    # --- 검색 영역 ---
+    sc1, sc2, sc3 = st.columns([2, 2, 1])
+    with sc1:
+        edit_test = st.selectbox(
+            "시험 과정 선택",
+            df_info_all['시험명'].dropna().unique().tolist(),
+            key="edit_test_select"
+        )
+    with sc2:
+        edit_name = st.text_input("학생 이름 입력", placeholder="예: 홍길동", key="edit_name_input")
+    with sc3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        search_btn = st.button("🔍 검색", use_container_width=True, key="edit_search_btn")
+
+    if search_btn:
+        if not edit_name.strip():
+            st.error("학생 이름을 입력해주세요.")
+        else:
+            # 띄어쓰기 무시 검색
+            search_name_clean = edit_name.strip().replace(" ", "").upper()
+            
+            df_edit_pool = df_results_all[
+                df_results_all['시험명'].astype(str).str.strip() == str(edit_test).strip()
+            ].copy()
+            
+            df_edit_pool['이름_정제'] = df_edit_pool['이름'].astype(str).str.replace(" ", "").str.upper()
+            df_found = df_edit_pool[df_edit_pool['이름_정제'] == search_name_clean]
+            
+            if df_found.empty:
+                st.warning(f"[{edit_test}] 과정에서 '{edit_name}' 학생을 찾을 수 없습니다.")
+            else:
+                st.session_state["edit_results"] = df_found.to_dict("records")
+                st.session_state["edit_test"] = edit_test
+
+    # --- 검색 결과 표시 ---
+    if "edit_results" in st.session_state and st.session_state.get("edit_test") == edit_test:
+        records = st.session_state["edit_results"]
+        
+        if len(records) > 1:
+            st.info(f"동일 이름의 레코드가 {len(records)}개 있습니다. 수정할 항목을 선택하세요.")
+            record_labels = [
+                f"[{r.get('분기','?')}] {r.get('이름','')} | {r.get('반','')}반 | 총점: {r.get('총점','')} | id: {r.get('id','')}"
+                for r in records
+            ]
+            selected_label = st.radio("수정할 레코드 선택:", record_labels, key="edit_record_select")
+            selected_idx = record_labels.index(selected_label)
+            target_record = records[selected_idx]
+        else:
+            target_record = records[0]
+
+        st.markdown("---")
+        st.markdown(f"### 📝 수정 폼 — {target_record.get('이름','')} 학생 (id: `{target_record.get('id','')}`)")
+
+        # 메타 정보 수정 폼
+        m1, m2, m3, m4, m5, m6 = st.columns([1.2, 1.5, 1.5, 1.5, 1.2, 1.5])
+        with m1:
+            new_type = st.radio(
+                "구분", ["재원생", "신규생"],
+                index=["재원생","신규생"].index(target_record.get("구분","재원생")) 
+                      if target_record.get("구분","재원생") in ["재원생","신규생"] else 0,
+                key="edit_type", horizontal=True
+            )
+        with m2:
+            new_name = st.text_input("이름", value=target_record.get("이름",""), key="edit_name_field")
+        with m3:
+            new_class = st.text_input("반", value=target_record.get("반",""), key="edit_class_field")
+        with m4:
+            new_school = st.text_input("학교", value=target_record.get("학교",""), key="edit_school_field")
+        with m5:
+            grade_options = ["중1","중2","중3"]
+            cur_grade = str(target_record.get("학년","중1"))
+            new_grade = st.selectbox(
+                "학년", grade_options,
+                index=grade_options.index(cur_grade) if cur_grade in grade_options else 0,
+                key="edit_grade_field"
+            )
+        with m6:
+            quarter_options_edit = [
+                "2025년 4분기",
+                "2026년 1분기", "2026년 2분기", "2026년 3분기", "2026년 4분기",
+                "2027년 1분기", "2027년 2분기", "기타/정기 평가"
+            ]
+            cur_quarter = str(target_record.get("분기","2026년 1분기"))
+            new_quarter = st.selectbox(
+                "분기", quarter_options_edit,
+                index=quarter_options_edit.index(cur_quarter) if cur_quarter in quarter_options_edit else 0,
+                key="edit_quarter_field"
+            )
+
+        st.markdown("---")
+        st.markdown("#### 📋 문항별 정답 수정")
+
+        # 해당 시험의 문항 정보 불러오기
+        df_info_edit = df_info_all[df_info_all['시험명'].astype(str).str.strip() == str(edit_test).strip()].copy()
+        
+        def clean_q(q):
+            nums = re.findall(r'\d+', str(q).split('.')[0])
+            return nums[0] if nums else str(q).strip()
+        
+        df_info_edit['문항번호'] = df_info_edit['문항번호'].apply(clean_q)
+        q_weight_map_edit = dict(zip(df_info_edit['문항번호'].astype(str), df_info_edit['배점'].astype(int)))
+        question_numbers_edit = sorted(q_weight_map_edit.keys(), key=lambda x: int(re.findall(r'\d+', x)[0]) if re.findall(r'\d+', x) else x)
+
+        new_answers = {}
+        if question_numbers_edit:
+            for i in range(0, len(question_numbers_edit), 4):
+                cols = st.columns(4)
+                for j, q_num in enumerate(question_numbers_edit[i:i+4]):
+                    with cols[j]:
+                        # 기존 정답 여부 파악 (1이면 O, 0이면 X)
+                        cur_val = target_record.get(str(q_num), 0)
+                        try:
+                            cur_ox = "O" if int(float(str(cur_val))) == 1 else "X"
+                        except:
+                            cur_ox = "X"
+                        
+                        choice = st.radio(
+                            f"**{q_num}번 ({q_weight_map_edit[q_num]}점)**",
+                            options=["O", "X"],
+                            index=0 if cur_ox == "O" else 1,
+                            horizontal=True,
+                            key=f"edit_q_{q_num}"
+                        )
+                        new_answers[str(q_num)] = 1 if choice == "O" else 0
+
+        # 수정된 총점 자동 계산
+        new_total = sum(new_answers[q] * q_weight_map_edit[q] for q in new_answers)
+        new_c2 = sum(1 for q in new_answers if q_weight_map_edit.get(q) == 2 and new_answers[q] == 1)
+        new_c3 = sum(1 for q in new_answers if q_weight_map_edit.get(q) == 3 and new_answers[q] == 1)
+        new_c4 = sum(1 for q in new_answers if q_weight_map_edit.get(q) == 4 and new_answers[q] == 1)
+
+        st.markdown("---")
+        rc1, rc2, rc3, rc4 = st.columns(4)
+        with rc1: st.metric("💯 수정 후 총점", f"{new_total} 점")
+        with rc2: st.metric("🟢 2점 정답", f"{new_c2} 개")
+        with rc3: st.metric("🔵 3점 정답", f"{new_c3} 개")
+        with rc4: st.metric("🔴 4점 정답", f"{new_c4} 개")
+
+        st.markdown("---")
+        btn1, btn2 = st.columns([1, 1])
+
+        # --- 저장 버튼 ---
+        with btn1:
+            if st.button("💾 수정 내용 저장", type="primary", use_container_width=True, key="edit_save_btn"):
+                try:
+                    record_id = target_record.get("id")
+                    update_data = {
+                        "구분": new_type,
+                        "이름": new_name.strip(),
+                        "반": new_class.strip(),
+                        "학교": new_school.strip(),
+                        "학년": new_grade,
+                        "분기": new_quarter,
+                        "총점": new_total,
+                        "맞은개수_2점": new_c2,
+                        "맞은개수_3점": new_c3,
+                        "맞은개수_4점": new_c4,
+                    }
+                    update_data.update(new_answers)
+                    
+                    supabase.table("student_results").update(update_data).eq("id", record_id).execute()
+                    st.cache_data.clear()
+                    st.success(f"✅ {new_name} 학생의 성적이 성공적으로 수정되었습니다! (총점: {new_total}점)")
+                    
+                    # 세션 초기화로 폼 닫기
+                    del st.session_state["edit_results"]
+                    time.sleep(1.5)
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"저장 중 오류 발생: {e}")
+
+        # --- 삭제 버튼 ---
+        with btn2:
+            if st.button("🗑️ 이 레코드 삭제", type="secondary", use_container_width=True, key="edit_delete_btn"):
+                st.session_state["confirm_delete"] = True
+
+        if st.session_state.get("confirm_delete"):
+            st.warning(f"⚠️ 정말로 **{target_record.get('이름','')}** 학생의 이 레코드를 삭제하시겠습니까? 복구가 불가능합니다.")
+            d1, d2 = st.columns(2)
+            with d1:
+                if st.button("✅ 네, 삭제합니다", type="primary", key="confirm_yes"):
+                    try:
+                        record_id = target_record.get("id")
+                        supabase.table("student_results").delete().eq("id", record_id).execute()
+                        st.cache_data.clear()
+                        st.success("🗑️ 레코드가 삭제되었습니다.")
+                        del st.session_state["edit_results"]
+                        st.session_state["confirm_delete"] = False
+                        time.sleep(1.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"삭제 중 오류 발생: {e}")
+            with d2:
+                if st.button("❌ 취소", key="confirm_no"):
+                    st.session_state["confirm_delete"] = False
+                    st.rerun()
