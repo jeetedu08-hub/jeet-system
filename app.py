@@ -823,35 +823,35 @@ with tab3:
                 # 분기 + 시험과정으로 2차 필터링 완료된 데이터셋 생성
                 df_final_filtered = df_quarter_filtered[df_quarter_filtered['시험명'].astype(str).str.strip() == selected_test_batch]
                 
-# 3-1. 학년 필터 먼저 선택
-all_grades = df_final_filtered['학년'].astype(str).str.strip().unique().tolist()
-grade_list = sorted([g for g in all_grades if g and g not in ['0', '0.0', 'nan', 'None', '']])
+            # 3-1. 학년 필터 먼저 선택
+                all_grades = df_final_filtered['학년'].astype(str).str.strip().unique().tolist()
+                grade_list = sorted([g for g in all_grades if g and g not in ['0', '0.0', 'nan', 'None', '']])
 
-if grade_list:
-    selected_grade_batch = st.selectbox(
-        "🎓 학년을 선택하세요:", 
-        grade_list, 
-        key="batch_grade_select"
-    )
-    # 학년으로 3차 필터링
-    df_grade_filtered = df_final_filtered[
-        df_final_filtered['학년'].astype(str).str.strip() == selected_grade_batch
-    ]
-else:
-    st.warning("⚠ 학년 데이터가 존재하지 않습니다.")
-    df_grade_filtered = df_final_filtered
-    selected_grade_batch = ""
+                if grade_list:
+                    selected_grade_batch = st.selectbox(
+                        "🎓 학년을 선택하세요:",
+                        grade_list,
+                        key="batch_grade_select"
+                    )
+                    df_grade_filtered = df_final_filtered[
+                        df_final_filtered['학년'].astype(str).str.strip() == selected_grade_batch
+                    ]
+                else:
+                    st.warning("⚠ 학년 데이터가 존재하지 않습니다.")
+                    df_grade_filtered = df_final_filtered
+                    selected_grade_batch = ""
 
-# 3-2. 학년 필터 적용 후 반 목록 추출
-all_classes = df_grade_filtered['반'].astype(str).str.strip().unique().tolist()
-class_list = sorted([c for c in all_classes if c and c not in ['0', '0.0', 'nan', 'None', '']])
+                # 3-2. 학년 필터 후 반 목록 추출
+                all_classes = df_grade_filtered['반'].astype(str).str.strip().unique().tolist()
+                class_list = sorted([c for c in all_classes if c and c not in ['0', '0.0', 'nan', 'None', '']])
 
-if class_list:
-    target_class = st.selectbox("📌 출력할 반을 선택하세요:", class_list, key="batch_class_select")                    
-                    # 4. 해당 분기, 시험, 반에 정확히 포진한 학생 목록 추출
+                if class_list:
+                    target_class = st.selectbox("📌 출력할 반을 선택하세요:", class_list, key="batch_class_select")
+
+                    # 4. 학년+반 기준으로 학생 목록 추출
                     students_in_class = df_grade_filtered[
-    df_grade_filtered['반'].astype(str).str.strip() == target_class
-]['이름'].astype(str).str.strip().unique().tolist()
+                        df_grade_filtered['반'].astype(str).str.strip() == target_class
+                    ]['이름'].astype(str).str.strip().unique().tolist()
                     students_in_class = sorted([s for s in students_in_class if s and s not in ['0', 'nan', 'None', '']])
                     
                     if students_in_class:
