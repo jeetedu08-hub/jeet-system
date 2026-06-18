@@ -250,6 +250,17 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
              label='학생 점수')
     ax1.fill(angles, s_scaled, color=COLOR_RADAR_STUDENT, alpha=0.28, zorder=3)
 
+    # ── 신규생: 학생 점수 꼭짓점에 실제 % 수치 라벨 표시 ──────────
+    if is_new:
+        for ang, disp_v, real_v in zip(angles[:-1], s_scaled[:-1], s_raw):
+            ax1.annotate(f"{int(round(real_v))}%",
+                         xy=(ang, disp_v), xytext=(0, 6),
+                         textcoords='offset points',
+                         ha='center', va='center',
+                         fontsize=8, fontweight='bold',
+                         color=COLOR_RADAR_STUDENT, zorder=6,
+                         path_effects=[path_effects.withStroke(linewidth=2.0, foreground='white')])
+
     # ── 시험지 전체 평균: 초록 파선(--) + 채우기 ──────────────
     avg_raw    = avg_cat_ratio.reindex(ordered_labels).fillna(0).values.tolist()
     avg_scaled = _scalel(avg_raw) + [_scale(avg_raw[0])]
@@ -307,14 +318,25 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
     s_pct     = s_pct_raw.apply(_scale)                    # 표시용 (신규생=실제값)
     max_b_val = s_pct.max() if not s_pct.empty else 0
     if is_new:
-        # 신규생: 실제값(0~100) 기준, 0부터 시작
-        ax2_limit = max(50, min(105, max_b_val + 15))
+        # 신규생: 실제값(0~100) 기준, 0부터 시작 (막대 위 수치 라벨 공간 확보)
+        ax2_limit = max(55, min(112, max_b_val + 18))
     else:
         ax2_limit = max(50, min(115, max_b_val + 15))
 
     # ── 학생 막대: 파랑 ────────────────────────────────────────
     ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.85,
             width=bar_width, zorder=3, label='학생 점수')
+
+    # ── 신규생: 각 막대 위에 실제 % 수치 라벨 표시 ───────────────
+    if is_new:
+        for xi, (disp_v, real_v) in enumerate(zip(s_pct, s_pct_raw)):
+            ax2.annotate(f"{int(round(real_v))}%",
+                         xy=(xi, disp_v), xytext=(0, 3),
+                         textcoords='offset points',
+                         ha='center', va='bottom',
+                         fontsize=8, fontweight='bold',
+                         color=COLOR_STUDENT, zorder=6,
+                         path_effects=[path_effects.withStroke(linewidth=2.0, foreground='white')])
 
     # ── 시험지 전체 평균: 초록 실선 + 원형 마커 ───────────────
     if unit_avg_data is not None and not unit_avg_data.empty:
@@ -329,6 +351,19 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
                  marker='o', markersize=6,
                  markerfacecolor='white', markeredgewidth=2,
                  zorder=5, label='과정 평균')
+        # 신규생: 과정평균 마커 아래에 실제 % 수치 표시
+        if is_new:
+            for xi, u in enumerate(final_unit_data.index):
+                denom  = final_unit_data.loc[u, '배점'] if u in final_unit_data.index else 0
+                numer  = unit_avg_data.loc[u, '평균득점'] if u in unit_avg_data.index else 0
+                real_pct = (numer / denom * 100) if denom > 0 else 0
+                ax2.annotate(f"{int(round(real_pct))}%",
+                             xy=(xi, avg_unit_pct[xi]), xytext=(0, -11),
+                             textcoords='offset points',
+                             ha='center', va='top',
+                             fontsize=7, fontweight='bold',
+                             color=COLOR_AVG, zorder=6,
+                             path_effects=[path_effects.withStroke(linewidth=1.8, foreground='white')])
 
     # ── 같은 반 평균: 주황 실선 + 다이아몬드 마커 ─────────────
     if class_unit_avg_data is not None and not class_unit_avg_data.empty:
