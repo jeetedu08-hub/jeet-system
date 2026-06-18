@@ -42,17 +42,11 @@ COLOR_AVG = '#757575'
 COLOR_GRID = '#E0E0E0'
 COLOR_BG = '#F8F9FA'
 
-# --- 🛠️ 2. Supabase 연동 및 캠퍼스 동적 스위칭 설정 (수정 완료) ---
+# --- 2. Supabase 연동 및 캠퍼스 동적 스위칭 설정 ---
 def init_supabase_dynamic():
-    """
-    스트림릿 Secrets에 설정된 환경변수 정보를 기반으로
-    죽전 또는 영통 캠퍼스 DB로 동적 연결하고 캠퍼스 맞춤 설정을 반환합니다.
-    """
-    # 금고(Secrets)에 원장님이 새로 입력하신 campus_name이 있는지 먼저 확인합니다.
     supabase_secrets = st.secrets.get("supabase", {})
     secret_campus_name = supabase_secrets.get("campus_name", "")
 
-    # 1. 영통 캠퍼스 전용 세팅이 존재하거나, 금고 이름표가 '영통캠퍼스'인 경우
     if "yeongtong_supabase" in st.secrets or secret_campus_name == "영통캠퍼스":
         if "yeongtong_supabase" in st.secrets:
             url = st.secrets["yeongtong_supabase"]["url"]
@@ -64,25 +58,23 @@ def init_supabase_dynamic():
         campus_name = "영통캠퍼스"
         campus_config = {
             "title_text": "📊 JEET 영통캠퍼스 성적 통합 관리 시스템",
-            "logo_file": "logo_yeongtong.png", # 영통용 로고 파일명
+            "logo_file": "logo_yeongtong.png",
             "footer_campuses": [
                 ("영통 캠퍼스 주소 및 문의처", "전화번호 및 상세 주소를 입력하세요")
             ]
         }
-    # 2. 그 외에는 기본 죽전 캠퍼스로 자동 작동
     else:
         if "jukjeon_supabase" in st.secrets:
             url = st.secrets["jukjeon_supabase"]["url"]
             key = st.secrets["jukjeon_supabase"]["key"]
         else:
-            # 기존 구형 Secrets 및 공통 [supabase] 구조 대응
             url = st.secrets.get("SUPABASE_URL", supabase_secrets.get("url"))
             key = st.secrets.get("SUPABASE_KEY", supabase_secrets.get("key"))
             
         campus_name = "죽전캠퍼스"
         campus_config = {
             "title_text": "📊 JEET 죽전캠퍼스 성적 통합 관리 시스템",
-            "logo_file": "logo.png", # 기존 쓰시던 죽전 로고 파일명
+            "logo_file": "logo.png",
             "footer_campuses": [
                 ("수지 캠퍼스: 276-8003", "풍덕천로 129번길 16-1"), 
                 ("죽전 캠퍼스: 263-8003", "기흥구 죽현로 29"), 
@@ -91,7 +83,6 @@ def init_supabase_dynamic():
         }
     return create_client(url, key), campus_name, campus_config
 
-# 동적 연결 및 캠퍼스 글로벌 변수 선언
 try:
     supabase, CURRENT_CAMPUS, CAMPUS_CFG = init_supabase_dynamic()
 except Exception as e:
@@ -101,15 +92,9 @@ except Exception as e:
 
 @st.cache_data(ttl=1)
 def fetch_all_dataframes():
-    # 동적으로 선택된 supabase 객체를 기반으로 조회 진행
-    
-    # 💡 수정 전: info_res = supabase.table("test_info").select("*").execute()
-    # 💡 수정 후: 넉넉하게 1만 줄까지 가져오도록 변경
     info_res = supabase.table("test_info").select("*").limit(10000).execute()
     df_info = pd.DataFrame(info_res.data)
     
-    # 💡 수정 전: results_res = supabase.table("student_results").select("*").execute()
-    # 💡 수정 후: 여기도 1만 줄로 늘려줍니다.
     results_res = supabase.table("student_results").select("*").limit(10000).execute()
     df_results = pd.DataFrame(results_res.data)
     
@@ -121,7 +106,6 @@ def fetch_all_dataframes():
             
         df_results = df_results.fillna(0)
         
-        # 문항 번호 표준화 함수
         def normalize_col(col_name):
             col_str = str(col_name).strip().split('.')[0]
             nums = re.findall(r'\d+', col_str)
@@ -136,7 +120,6 @@ def fetch_all_dataframes():
                 new_columns.append(normalize_col(col))
         df_results.columns = new_columns
 
-        # [보정] 맞은 개수 및 총점 누락 데이터 실시간 자동 보정/계산 로직
         if not df_info.empty:
             df_info['문항번호_정제'] = df_info['문항번호'].apply(normalize_col)
             weight_dict = {}
@@ -166,7 +149,6 @@ def fetch_all_dataframes():
                                 elif weight == 3: c_3 += 1
                                 elif weight == 4: c_4 += 1
                     
-                    # 맞은 개수 보정
                     if pd.isna(res_row.get('맞은개수_2점')) or res_row.get('맞은개수_2점') == 0:
                         df_results.at[idx, '맞은개수_2점'] = c_2
                     if pd.isna(res_row.get('맞은개수_3점')) or res_row.get('맞은개수_3점') == 0:
@@ -174,121 +156,205 @@ def fetch_all_dataframes():
                     if pd.isna(res_row.get('맞은개수_4점')) or res_row.get('맞은개수_4점') == 0:
                         df_results.at[idx, '맞은개수_4점'] = c_4
                         
-                    # 총점 보정
                     if pd.isna(res_row.get('총점')) or res_row.get('총점') == 0:
                         df_results.at[idx, '총점'] = calculated_total
         
     return df_info, df_results
 
 
-# --- 3. 공통 그래프 그리기 함수 ---
+# --- 3. 공통 그래프 그리기 함수 (다크 네이비 프리미엄 디자인) ---
 def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order):
-    border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
-    fig.patches.append(border)
 
-    if os.path.exists("logo.png"):
-        logo_img = plt.imread("logo.png")
-        logo_img_axes = fig.add_axes([0.80, 0.915, 0.15, 0.045], zorder=15)
-        logo_img_axes.imshow(logo_img)
-        logo_img_axes.axis('off')
+    C_BG     = '#0D1B2A'
+    C_CARD   = '#1B2A3B'
+    C_ACCENT = '#E8C97A'
+    C_BLUE   = '#4A9EBF'
+    C_TEXT   = '#F0F4F8'
+    C_MUTED  = '#8BA0B4'
+    C_GRID   = '#2A3F54'
+    C_BORDER = '#2E4460'
 
-    txt_jeet = fig.text(0.31, 0.88, 'JEET', fontsize=42, fontweight='bold', color=COLOR_RED, ha='right')
-    txt_title = fig.text(0.33, 0.88, '수학 능력 분석 리포트', fontsize=32, fontweight='bold', color=COLOR_NAVY, ha='left')
-    
-    student_class = str(s_row.get('반', '')).strip()
+    fig.patch.set_facecolor(C_BG)
+
+    # ── 외곽 골드 테두리 ──
+    for offset, lw in [(0.008, 6), (0.012, 2)]:
+        color = C_ACCENT if lw == 6 else C_BG
+        fig.patches.append(plt.Rectangle(
+            (offset, offset), 1-offset*2, 1-offset*2,
+            fill=False, edgecolor=color, linewidth=lw,
+            transform=fig.transFigure, zorder=10
+        ))
+
+    # ── 헤더 배경 배너 ──
+    fig.patches.append(plt.Rectangle(
+        (0.0, 0.88), 1.0, 0.12,
+        fill=True, facecolor=C_CARD,
+        transform=fig.transFigure, zorder=5
+    ))
+    fig.add_artist(plt.Line2D(
+        [0.05, 0.95], [0.88, 0.88],
+        color=C_ACCENT, linewidth=1.5,
+        transform=fig.transFigure, zorder=11
+    ))
+
+    # ── 로고 ──
+    logo_file = CAMPUS_CFG.get("logo_file", "logo.png")
+    if os.path.exists(logo_file):
+        logo_ax = fig.add_axes([0.78, 0.905, 0.16, 0.055], zorder=15)
+        logo_ax.imshow(plt.imread(logo_file))
+        logo_ax.axis('off')
+
+    # ── 타이틀 ──
+    fig.text(0.06, 0.945, 'JEET', fontsize=38, fontweight='bold',
+             color=C_ACCENT, ha='left', va='center', zorder=12)
+    fig.text(0.225, 0.945, '수학 능력 분석 리포트', fontsize=26, fontweight='bold',
+             color=C_TEXT, ha='left', va='center', zorder=12)
+
+    # ── 학생 정보 ──
+    student_class   = str(s_row.get('반', '')).strip()
     student_quarter = str(s_row.get('분기', '')).strip()
-    
-    class_text = f"{student_class} | " if student_class and student_class != '0' and student_class != '0.0' else ""
-    quarter_text = f" [{student_quarter}]" if student_quarter and student_quarter != '0' and student_quarter != '0.0' else ""
-    
-    info_text = f"학교: {s_row.get('학교', '')} | 학년: {student_grade} | {class_text}이름: {student_name} | 과정: {selected_test}{quarter_text}"
-    txt_info = fig.text(0.5, 0.84, info_text, ha='center', fontsize=12, fontweight='bold', color='#222')
+    class_text   = f"{student_class}  |  " if student_class   not in ['', '0', '0.0'] else ""
+    quarter_text = f"  [{student_quarter}]"  if student_quarter not in ['', '0', '0.0'] else ""
+    info_str = (f"학교: {s_row.get('학교','')}   |   학년: {student_grade}   |   "
+                f"{class_text}이름: {student_name}   |   과정: {selected_test}{quarter_text}")
+    fig.text(0.5, 0.897, info_str, ha='center', va='center',
+             fontsize=9.5, color=C_MUTED, zorder=12)
 
-    txt_jeet.set_path_effects([path_effects.withStroke(linewidth=2, foreground=COLOR_RED)])
-    txt_title.set_path_effects([path_effects.withStroke(linewidth=1.5, foreground=COLOR_NAVY)])
-    txt_info.set_path_effects([path_effects.withStroke(linewidth=1, foreground='#222')])
+    # ════════════════════════════════════
+    #  방사형 그래프 — ax 좌표 넓게 확보
+    # ════════════════════════════════════
+    ax1 = fig.add_axes([0.06, 0.53, 0.40, 0.32], polar=True)
+    ax1.set_facecolor(C_CARD)
 
-    # --- (이후 그래프 그리는 코드는 동일) ---
-    
-    # --- 이후 그래프 및 진단 내용 코드는 기존과 동일하게 유지 ---
+    all_cats    = cat_ratio.index.tolist()
+    ordered_lbl = (['계산력'] + [c for c in all_cats if c != '계산력']
+                   if '계산력' in all_cats else all_cats)
+    s_ord  = cat_ratio.reindex(ordered_lbl)
+    labels = s_ord.index.tolist()
+    n      = len(labels)
 
-    # --- 방사형 그래프 ---
-    ax1 = fig.add_axes([0.10, 0.52, 0.32, 0.22], polar=True)
-    all_cats = cat_ratio.index.tolist()
-    ordered_labels = ['계산력'] + [c for c in all_cats if c != '계산력'] if '계산력' in all_cats else all_cats
-    s_ordered = cat_ratio.reindex(ordered_labels)
-    labels = s_ordered.index.tolist()
-    s_vals = s_ordered.values.tolist() + [s_ordered.values[0]]
-    angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False).tolist() + [0]
-    
-    max_s_val = max(s_vals) if len(s_vals) > 0 else 0
-    ax1_limit = max(45, min(110, max_s_val + (max_s_val * 0.25) + 10))
-    
-    ax1.set_theta_direction(-1); ax1.set_theta_offset(np.pi/2.0)
-    ax1.plot(angles, s_vals, color=COLOR_RED, linewidth=2.5, label='학생 점수')
-    ax1.set_ylim(0, ax1_limit); ax1.set_xticks(angles[:-1]); ax1.set_xticklabels([]); ax1.set_yticklabels([]) 
-    
-    for i in range(len(labels)):
-        angle = angles[i]; label_text = labels[i]
-        dist_tb = ax1_limit * 1.05  
-        dist_lr = ax1_limit * 1.02  
-        
-        ha, va, dist = ('center', 'bottom', dist_tb) if angle == 0 else ('left', 'center', dist_lr) if 0 < angle < np.pi else ('center', 'top', dist_tb) if angle == np.pi else ('right', 'center', dist_lr)
-        
-        if '문제\n해결력' in label_text: 
-            dist += (ax1_limit * 0.08)
-            ha = 'left' if 0 < angle < np.pi else 'right'
-            
-        ax1.text(angle, dist, label_text, fontsize=10, fontweight='bold', va=va, ha=ha, color=COLOR_NAVY)
-        
-        s_v = int(s_vals[i])
-        td = s_v - (ax1_limit * 0.12) if s_v > ax1_limit * 0.85 else s_v + (ax1_limit * 0.12)
-        txt_s = ax1.text(angle, td, f"{s_v}%", fontsize=9, fontweight='bold', color=COLOR_RED, va='center', ha='center')
-        txt_s.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
-    
-    title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
-    title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
+    # 정확히 균등 분할 (12시=0, 3시=π/2, 6시=π, 9시=3π/2)
+    angles = [i * 2 * np.pi / n for i in range(n)]
+    s_vals = s_ord.values.tolist()
+    ax_lim = max(45, min(110, max(s_vals) * 1.3 + 10)) if s_vals else 100
 
-    # --- 단원별 성취도 그래프 ---
-    ax2 = fig.add_axes([0.55, 0.54, 0.35, 0.18]) 
-    
-    final_unit_data = unit_data.reindex(unit_order).fillna(0)
-    x_pos = np.arange(len(final_unit_data))
-    bar_width = 0.45 
-    
-    s_pct = (final_unit_data['득점'] / final_unit_data['배점'] * 100).fillna(0)
-    
-    max_b_val = s_pct.max() if not s_pct.empty else 0
-    ax2_limit = max(40, min(110, max_b_val + (max_b_val * 0.25) + 15)) 
-    
-    ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3)
-    
+    ax1.set_theta_direction(-1)
+    ax1.set_theta_offset(np.pi / 2)
+
+    for r in [25, 50, 75, 100]:
+        if r <= ax_lim:
+            ax1.plot(angles + [angles[0]], [r]*(n+1),
+                     color=C_GRID, linewidth=0.6, linestyle='--', zorder=1)
+
+    closed_angles = angles + [angles[0]]
+    closed_vals   = s_vals  + [s_vals[0]]
+
+    ax1.fill(angles, s_vals, color=C_ACCENT, alpha=0.18, zorder=2)
+    ax1.plot(closed_angles, closed_vals, color=C_ACCENT, linewidth=2.5, zorder=3)
+    ax1.scatter(angles, s_vals, color=C_ACCENT, s=45, zorder=4,
+                edgecolors=C_BG, linewidths=1.5)
+
+    ax1.set_ylim(0, ax_lim)
+    ax1.set_xticks([])
+    ax1.set_yticklabels([])
+    ax1.spines['polar'].set_color(C_GRID)
+    ax1.grid(color=C_GRID, linewidth=0.5)
+
+    # 라벨 배치 — 방향별 ha/va 완전 고정
+    label_configs = {
+        0:              ('center', 'bottom', ax_lim * 1.22, ax_lim * 1.08),  # 12시
+        np.pi / 2:      ('left',   'center', ax_lim * 1.18, ax_lim * 1.18),  # 3시
+        np.pi:          ('center', 'top',    ax_lim * 1.22, ax_lim * 1.08),  # 6시
+        3 * np.pi / 2:  ('right',  'center', ax_lim * 1.18, ax_lim * 1.18),  # 9시
+    }
+
+    for i, (angle, label) in enumerate(zip(angles, labels)):
+        sv = int(s_vals[i])
+        # 가장 가까운 방향 키 찾기
+        closest = min(label_configs.keys(), key=lambda k: abs(k - angle))
+        ha, va_lbl, lbl_dist, val_dist = label_configs[closest]
+
+        ax1.text(angle, lbl_dist, label,
+                 fontsize=10, fontweight='bold',
+                 color=C_TEXT, ha=ha, va=va_lbl,
+                 multialignment='center')
+
+        txt = ax1.text(angle, val_dist, f"{sv}%",
+                       fontsize=9, fontweight='bold',
+                       color=C_ACCENT, ha=ha, va='center')
+        txt.set_path_effects([path_effects.withStroke(linewidth=2.5, foreground=C_CARD)])
+
+    ax1.set_title("▶ 영역별 핵심 역량 지표 (%)",
+                  pad=30, fontsize=12, fontweight='bold', color=C_TEXT)
+
+    # ════════════════════════════════════
+    #  단원별 막대 그래프 — ax 위치/크기 재조정
+    # ════════════════════════════════════
+    ax2 = fig.add_axes([0.53, 0.565, 0.41, 0.27])
+    ax2.set_facecolor(C_CARD)
+    for spine in ax2.spines.values():
+        spine.set_edgecolor(C_BORDER)
+        spine.set_linewidth(0.8)
+
+    final_unit = unit_data.reindex(unit_order).fillna(0)
+    s_pct      = (final_unit['득점'] / final_unit['배점'] * 100).fillna(0)
+    x_pos      = np.arange(len(final_unit))
+    ax2_lim    = 115  # 고정 상한 → 모든 막대 기준선 일치 보장
+
+    for yv in [25, 50, 75, 100]:
+        ax2.axhline(yv, color=C_GRID, linewidth=0.6, linestyle='--', zorder=1)
+
+    bar_colors = [C_ACCENT if v >= 80 else C_BLUE for v in s_pct]
+    ax2.bar(x_pos, s_pct, color=bar_colors, alpha=0.9,
+            width=0.55, zorder=3, edgecolor='none')
+
+    ax2.set_xlim(-0.5, len(x_pos) - 0.5)
+    ax2.set_ylim(0, ax2_lim)
     ax2.set_xticks(x_pos)
-    ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in final_unit_data.index], fontsize=8, fontweight='bold')
-    ax2.tick_params(axis='x', which='both', length=0) 
-    ax2.set_ylim(0, ax2_limit); ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
-    title2 = ax2.set_title("▶ 단원별 성취도 (%)", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
-    title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
-    
-    for i in range(len(x_pos)):
-        val = int(s_pct.iloc[i])
-        pos = x_pos[i]
-        y_p = val + (ax2_limit * 0.04)
-        t = ax2.text(pos, y_p, f"{val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_STUDENT)
-        t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
+    ax2.set_xticklabels(
+        [textwrap.fill(str(l), 5) for l in final_unit.index],
+        fontsize=8, fontweight='bold', color=C_TEXT
+    )
+    ax2.tick_params(colors=C_MUTED, length=0)
+    ax2.yaxis.set_visible(False)
 
-    # --- 하단 심층 분석 박스 ---
-    rect_diag = plt.Rectangle((0.08, 0.12), 0.84, 0.35, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
-    fig.patches.append(rect_diag)
-    
-    t_p1 = fig.text(0.11, 0.44, "▶ ", fontsize=13, fontweight='bold', color=COLOR_NAVY)
-    t_p2 = fig.text(0.13, 0.44, " JEET", fontsize=13, fontweight='bold', color=COLOR_RED)
-    t_p3 = fig.text(0.185, 0.44, f" 중등 자사 센터 {student_name} 학생 심층 분석", fontsize=13, fontweight='bold', color=COLOR_NAVY)
-    for t_obj in [t_p1, t_p2, t_p3]: t_obj.set_path_effects([path_effects.withStroke(linewidth=1, foreground=t_obj.get_color())])
-    
-    u_res = s_pct 
+    for i, val in enumerate(s_pct):
+        color = C_ACCENT if val >= 80 else C_BLUE
+        t = ax2.text(x_pos[i], val + ax2_lim * 0.03, f"{int(val)}%",
+                     ha='center', va='bottom',
+                     fontsize=9, fontweight='bold', color=color)
+        t.set_path_effects([path_effects.withStroke(linewidth=2, foreground=C_CARD)])
+
+    ax2.set_title("▶ 단원별 성취도 (%)",
+                  pad=14, fontsize=12, fontweight='bold', color=C_TEXT)
+
+    # ════════════════════════════════════
+    #  심층 분석 박스 — 위치/크기 재조정
+    # ════════════════════════════════════
+    fig.patches.append(plt.Rectangle(
+        (0.05, 0.08), 0.90, 0.43,
+        fill=True, facecolor=C_CARD,
+        edgecolor=C_BORDER, linewidth=1,
+        transform=fig.transFigure, zorder=5
+    ))
+    fig.add_artist(plt.Line2D(
+        [0.055, 0.055], [0.085, 0.505],
+        color=C_ACCENT, linewidth=3,
+        transform=fig.transFigure, zorder=11
+    ))
+    fig.text(0.075, 0.500,
+             f"▶  JEET  중등 자사 센터  {student_name} 학생 심층 분석",
+             fontsize=11.5, fontweight='bold', color=C_TEXT, zorder=12)
+    fig.add_artist(plt.Line2D(
+        [0.075, 0.945], [0.492, 0.492],
+        color=C_GRID, linewidth=0.8,
+        transform=fig.transFigure, zorder=11
+    ))
+
+    # ── 진단 텍스트 ──
+    u_res   = (unit_data['득점'] / unit_data['배점'] * 100).fillna(0)
     avg_val = int(cat_ratio.mean())
-    
+
     if avg_val >= 80:
         eval_tier = "심화 개념의 완벽한 체득과 날카로운 수학적 직관력을 겸비한 최상위권 수준의 성취를 보여줍니다. 고난도 문항 해결 능력이 탁월하며 자기 주도적 심화 학습이 충분히 가능한 상태"
     elif avg_val >= 60:
@@ -297,7 +363,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
         eval_tier = "핵심 개념을 정교하게 다듬어가는 과정에 있으며, 학습 잠재력이 점진적으로 발현되는 도약 단계의 성취를 보여줍니다. 꾸준한 학습 태도를 유지한다면 성취도 향상이 기대되는 상황"
     else:
         eval_tier = "수학적 기초 체력을 보강하며 자신감을 쌓아가는 기틀 마련 단계의 성취를 보여줍니다. 학습적 결손을 메우고 성공적인 문제 풀이 경험을 축적하여 학습 동기를 부여하는 데 집중해야하는 시점"
-        
+
     diag_total = f"{student_name} 학생은 성취도 {avg_val}%를 기록하며, 현재 {eval_tier}입니다."
 
     c_best = cat_ratio[cat_ratio >= 80].index.str.replace('\n', '').tolist()
@@ -323,9 +389,8 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     if not (g_best or g_good or g_weak or g_warn):
         diag_combined += "전반적인 단원별 성취도가 매우 균형 있게 나타나고 있습니다. 어느 한 쪽으로 치우치지 않는 고른 학습 균형이 큰 강점입니다."
 
-    weak_list = u_res[u_res < 40].index.tolist()
-    avg_score = u_res.mean()
-
+    weak_list  = u_res[u_res < 40].index.tolist()
+    avg_score  = u_res.mean()
     units_text = ', '.join([f'<{u}>' for u in weak_list]) if weak_list else "핵심"
 
     if avg_score >= 80:
@@ -349,48 +414,37 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     total_chars = sum(len(content) for _, content in sections)
 
     if total_chars > 800:
-        wrap_width = 82        
-        main_fs = 6.8          
-        sub_fs = 8.5            
-        y_offset = 0.012       
-        section_gap = 0.025    
-        line_height = 0.014    
+        wrap_width, main_fs, sub_fs = 88, 6.8, 8.5
+        y_offset, section_gap, line_height = 0.012, 0.022, 0.0135
     elif total_chars > 600:
-        wrap_width = 74
-        main_fs = 7.5
-        sub_fs = 9.0
-        y_offset = 0.014
-        section_gap = 0.030
-        line_height = 0.016
+        wrap_width, main_fs, sub_fs = 78, 7.5, 9.0
+        y_offset, section_gap, line_height = 0.013, 0.026, 0.015
     else:
-        wrap_width = 65
-        main_fs = 8.2
-        sub_fs = 9.5
-        y_offset = 0.015
-        section_gap = 0.035
-        line_height = 0.018
+        wrap_width, main_fs, sub_fs = 68, 8.2, 9.5
+        y_offset, section_gap, line_height = 0.015, 0.030, 0.017
 
-    curr_y = 0.415 
+    curr_y = 0.485
     for subtitle, content in sections:
-        stxt = fig.text(0.11, curr_y, subtitle, fontsize=sub_fs, fontweight='bold', color='#222')
-        stxt.set_path_effects([path_effects.withStroke(linewidth=0.5, foreground='#222')])
-        
+        stxt = fig.text(0.075, curr_y, subtitle,
+                        fontsize=sub_fs, fontweight='bold', color=C_ACCENT, zorder=12)
+        stxt.set_path_effects([path_effects.withStroke(linewidth=0.5, foreground=C_ACCENT)])
         wrapped_content = textwrap.fill(content, width=wrap_width)
-        ctxt = fig.text(0.11, curr_y - y_offset, wrapped_content, fontsize=main_fs, linespacing=1.6, va='top', color='#333')
-        
+        fig.text(0.075, curr_y - y_offset, wrapped_content,
+                 fontsize=main_fs, linespacing=1.65, va='top', color=C_TEXT, zorder=12)
         num_lines = len(wrapped_content.split('\n'))
         curr_y -= (y_offset + (num_lines * line_height) + section_gap)
 
-    line_footer = plt.Line2D([0.05, 0.95], [0.10, 0.10], color=COLOR_NAVY, linewidth=1, transform=fig.transFigure); fig.lines.append(line_footer)
-    
-    # [수정] 하단 캠퍼스 안내 주소록 자동 분기 매핑
+    # ── 푸터 ──
+    fig.add_artist(plt.Line2D(
+        [0.05, 0.95], [0.075, 0.075],
+        color=C_ACCENT, linewidth=1.2,
+        transform=fig.transFigure, zorder=11
+    ))
     campuses = CAMPUS_CFG["footer_campuses"]
+    pos_x = [0.50] if len(campuses) == 1 else [0.22, 0.50, 0.78]
     for i, (name, addr) in enumerate(campuses):
-        # 영통 캠퍼스 1개인 경우 중앙 정렬 처리, 죽전 3개인 경우 균등 처리 자동 대응
-        pos_x = [0.50] if len(campuses) == 1 else [0.22, 0.50, 0.78]
-        fig.text(pos_x[i], 0.07, name, ha='center', fontsize=10, fontweight='bold', color=COLOR_NAVY)
-        fig.text(pos_x[i], 0.045, addr, ha='center', fontsize=7.5, color='#555')
-
+        fig.text(pos_x[i], 0.052, name, ha='center', fontsize=9.5, fontweight='bold', color=C_ACCENT)
+        fig.text(pos_x[i], 0.028, addr, ha='center', fontsize=7.5, color=C_MUTED)
 
 # --- 4. 데이터 가공 헬퍼 함수 ---
 def prepare_report_data(selected_test):
@@ -439,7 +493,6 @@ def prepare_report_data(selected_test):
                 target_col = df_results[q]
                 if isinstance(target_col, pd.DataFrame):
                     target_col = target_col.iloc[:, 0]
-                
                 df_scores[q] = target_col.apply(safe_to_binary)
             else:
                 df_scores[q] = 0 
@@ -461,24 +514,16 @@ def prepare_report_data(selected_test):
 def generate_jeet_expert_report(target_name, selected_test):
     try:
         df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary = prepare_report_data(selected_test)
-# 이 위쪽 코드들과 줄 맞춤(세로 선)이 같아야 합니다.
         student_found = False
         img_buffer = io.BytesIO()
         
         for _, s_row in df_results.iterrows():
-            # 1. 리포트 출력용 원본 이름 (오류가 났던 부분 복구!)
             student_name = str(s_row.get('이름', '')).strip()
-            
-            # 2. 검색 비교용 텍스트 (공백 모두 제거 및 대문자화)
             db_name = student_name.replace(" ", "").upper()
             search_name = str(target_name).replace(" ", "").strip().upper()
             
-            # 3. 띄어쓰기 무시하고 일치하는지 비교
             if not db_name or db_name == '0' or db_name != search_name:
                 continue
-                
-            # (이 아래로는 원래 있던 리포트 생성 코드가 이어지면 됩니다. 
-            #  이 아래 코드들도 당연히 if나 for문에 맞게 들여쓰기가 되어있어야 합니다.)
                 
             student_found = True
             student_grade = s_row.get('학년', '')
@@ -548,15 +593,11 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                 unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
                 unit_data = unit_data.reindex(unit_order).fillna(0)
 
-                # [수정] 신규 그래프 객체 생성 (A4 세로 비율)
                 fig = plt.figure(figsize=(8.27, 11.69), dpi=300)
                 draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
                 
                 temp_img_buffer = io.BytesIO()
-                # [수정] 세로 방향 강제 고정 및 저장
                 fig.savefig(temp_img_buffer, format='png', dpi=300, bbox_inches='tight', orientation='portrait')
-                
-                # [수정] 메모리 정리 (겹침 방지 핵심)
                 plt.clf()
                 plt.close(fig)
                 
@@ -634,13 +675,10 @@ if st.sidebar.button("🔄 데이터베이스 새로고침", use_container_width
     st.rerun()
 
 st.sidebar.markdown("---") 
-
-# [수정] 사이드바 최상단에 현재 동적으로 선택되어 구동 중인 캠퍼스 인디케이터 상시 노출!
 st.sidebar.markdown(f"### 🏢 현재 접속: **{CURRENT_CAMPUS}**")
 
 col1, col2 = st.columns([8, 2])
 with col1: 
-    # [수정] 접속 주소에 맞는 대시보드 메인 한글 타이틀 자동 연동 변경
     st.title(CAMPUS_CFG["title_text"])
 with col2: 
     logo_file = CAMPUS_CFG["logo_file"]
@@ -670,7 +708,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 개별 리포트 출력", 
     "📚 반별 일괄 리포트 출력", 
     "🟢 분기별 엑셀 추출",
-    "✏️ 성적 수정/삭제"   # ← 추가
+    "✏️ 성적 수정/삭제"
 ])
 
 # --- Tab 1: 성적 입력 ---
@@ -768,13 +806,10 @@ with tab1:
                     for q_num in question_numbers:
                         new_record[str(q_num)] = 1 if answers[str(q_num)] > 0 else 0
 
-                    # [수정] 글로벌 변수 supabase 객체를 동적으로 즉시 사용하도록 수정
                     supabase.table("student_results").insert(new_record).execute()
-                    
                     st.cache_data.clear() 
                     st.success(f"🎉 [{input_type}] {clean_name} 학생의 [{input_quarter}] 성적({total_score}점)이 DB에 성공적으로 저장되었습니다!")
                     st.session_state["input_session_key"] += 1
-                    
                     time.sleep(2.0)
                     st.rerun()
                     
@@ -797,19 +832,14 @@ with tab2:
 with tab3:
     st.subheader("📅 분기별/반별 전체 심층 분석 일괄 출력")
     
-    # 1. 데이터베이스에 '분기' 컬럼 유무 확인 후 분기 리스트 동적 추출
     if '분기' in df_results_all.columns and not df_results_all.empty:
         all_quarters = df_results_all['분기'].astype(str).str.strip().unique().tolist()
         quarter_list = sorted([q for q in all_quarters if q and q not in ['0', '0.0', 'nan', 'None', '']], reverse=True)
         
         if quarter_list:
-            # 원장님이 분기를 먼저 직관적으로 선택
             selected_quarter = st.selectbox("📅 출력할 분기를 선택하세요:", quarter_list, key="batch_quarter_select")
-            
-            # 선택한 분기에 해당하는 데이터만 1차 필터링
             df_quarter_filtered = df_results_all[df_results_all['분기'].astype(str).str.strip() == selected_quarter]
             
-            # 2. 해당 분기 내에 등록된 '시험명(과정)' 리스트 동적 추출
             all_tests_in_quarter = df_quarter_filtered['시험명'].astype(str).str.strip().unique().tolist()
             test_list_batch = sorted([t for t in all_tests_in_quarter if t and t not in ['0', 'nan', 'None', '']])
             
@@ -820,10 +850,8 @@ with tab3:
                     key="batch_test_select_under_quarter"
                 )
                 
-                # 분기 + 시험과정으로 2차 필터링 완료된 데이터셋 생성
                 df_final_filtered = df_quarter_filtered[df_quarter_filtered['시험명'].astype(str).str.strip() == selected_test_batch]
                 
-            # 3-1. 학년 필터 먼저 선택
                 all_grades = df_final_filtered['학년'].astype(str).str.strip().unique().tolist()
                 grade_list = sorted([g for g in all_grades if g and g not in ['0', '0.0', 'nan', 'None', '']])
 
@@ -841,14 +869,12 @@ with tab3:
                     df_grade_filtered = df_final_filtered
                     selected_grade_batch = ""
 
-                # 3-2. 학년 필터 후 반 목록 추출
                 all_classes = df_grade_filtered['반'].astype(str).str.strip().unique().tolist()
                 class_list = sorted([c for c in all_classes if c and c not in ['0', '0.0', 'nan', 'None', '']])
 
                 if class_list:
                     target_class = st.selectbox("📌 출력할 반을 선택하세요:", class_list, key="batch_class_select")
 
-                    # 4. 학년+반 기준으로 학생 목록 추출
                     students_in_class = df_grade_filtered[
                         df_grade_filtered['반'].astype(str).str.strip() == target_class
                     ]['이름'].astype(str).str.strip().unique().tolist()
@@ -884,7 +910,6 @@ with tab3:
         selected_students = None
         selected_test_batch = ""
 
-    # 일괄 압축 배포 및 파일 세이브 처리단
     if st.button("반 전체/선택 일괄 생성 (ZIP)", type="primary", key="batch_zip_btn"):
         if not target_class or not target_class.strip(): 
             st.error("반 이름을 올바르게 선택하거나 기입해 주십시오.")
@@ -894,7 +919,6 @@ with tab3:
             st.error("리포트 파일을 출력할 대상을 최소 한 명 이상 필터링해 주세요.")
         else:
             with st.spinner(f"[{selected_quarter} - {selected_test_batch}] '{target_class}' 반 리포트를 고화질 파일로 패키징 중입니다..."):
-                # 기존에 설계된 백엔드 비즈니스 로직 함수 완벽 호환 보존 호출
                 success, buf, msg = generate_batch_report(target_class, selected_test_batch, selected_students)
                 if success:
                     st.success(msg)
@@ -958,12 +982,12 @@ with tab4:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
+
 # --- Tab 5: 성적 수정/삭제 ---
 with tab5:
     st.subheader("✏️ 학생 성적 수정 / 삭제")
     st.markdown("검색 후 해당 학생의 성적을 수정하거나 레코드를 삭제할 수 있습니다.")
 
-    # --- 검색 영역 ---
     sc1, sc2, sc3 = st.columns([2, 2, 1])
     with sc1:
         edit_test = st.selectbox(
@@ -981,13 +1005,10 @@ with tab5:
         if not edit_name.strip():
             st.error("학생 이름을 입력해주세요.")
         else:
-            # 띄어쓰기 무시 검색
             search_name_clean = edit_name.strip().replace(" ", "").upper()
-            
             df_edit_pool = df_results_all[
                 df_results_all['시험명'].astype(str).str.strip() == str(edit_test).strip()
             ].copy()
-            
             df_edit_pool['이름_정제'] = df_edit_pool['이름'].astype(str).str.replace(" ", "").str.upper()
             df_found = df_edit_pool[df_edit_pool['이름_정제'] == search_name_clean]
             
@@ -997,7 +1018,6 @@ with tab5:
                 st.session_state["edit_results"] = df_found.to_dict("records")
                 st.session_state["edit_test"] = edit_test
 
-    # --- 검색 결과 표시 ---
     if "edit_results" in st.session_state and st.session_state.get("edit_test") == edit_test:
         records = st.session_state["edit_results"]
         
@@ -1016,7 +1036,6 @@ with tab5:
         st.markdown("---")
         st.markdown(f"### 📝 수정 폼 — {target_record.get('이름','')} 학생 (id: `{target_record.get('id','')}`)")
 
-        # 메타 정보 수정 폼
         m1, m2, m3, m4, m5, m6 = st.columns([1.2, 1.5, 1.5, 1.5, 1.2, 1.5])
         with m1:
             new_type = st.radio(
@@ -1055,7 +1074,6 @@ with tab5:
         st.markdown("---")
         st.markdown("#### 📋 문항별 정답 수정")
 
-        # 해당 시험의 문항 정보 불러오기
         df_info_edit = df_info_all[df_info_all['시험명'].astype(str).str.strip() == str(edit_test).strip()].copy()
         
         def clean_q(q):
@@ -1072,13 +1090,11 @@ with tab5:
                 cols = st.columns(4)
                 for j, q_num in enumerate(question_numbers_edit[i:i+4]):
                     with cols[j]:
-                        # 기존 정답 여부 파악 (1이면 O, 0이면 X)
                         cur_val = target_record.get(str(q_num), 0)
                         try:
                             cur_ox = "O" if int(float(str(cur_val))) == 1 else "X"
                         except:
                             cur_ox = "X"
-                        
                         choice = st.radio(
                             f"**{q_num}번 ({q_weight_map_edit[q_num]}점)**",
                             options=["O", "X"],
@@ -1088,7 +1104,6 @@ with tab5:
                         )
                         new_answers[str(q_num)] = 1 if choice == "O" else 0
 
-        # 수정된 총점 자동 계산
         new_total = sum(new_answers[q] * q_weight_map_edit[q] for q in new_answers)
         new_c2 = sum(1 for q in new_answers if q_weight_map_edit.get(q) == 2 and new_answers[q] == 1)
         new_c3 = sum(1 for q in new_answers if q_weight_map_edit.get(q) == 3 and new_answers[q] == 1)
@@ -1104,7 +1119,6 @@ with tab5:
         st.markdown("---")
         btn1, btn2 = st.columns([1, 1])
 
-        # --- 저장 버튼 ---
         with btn1:
             if st.button("💾 수정 내용 저장", type="primary", use_container_width=True, key="edit_save_btn"):
                 try:
@@ -1122,20 +1136,15 @@ with tab5:
                         "맞은개수_4점": new_c4,
                     }
                     update_data.update(new_answers)
-                    
                     supabase.table("student_results").update(update_data).eq("id", record_id).execute()
                     st.cache_data.clear()
                     st.success(f"✅ {new_name} 학생의 성적이 성공적으로 수정되었습니다! (총점: {new_total}점)")
-                    
-                    # 세션 초기화로 폼 닫기
                     del st.session_state["edit_results"]
                     time.sleep(1.5)
                     st.rerun()
-                    
                 except Exception as e:
                     st.error(f"저장 중 오류 발생: {e}")
 
-        # --- 삭제 버튼 ---
         with btn2:
             if st.button("🗑️ 이 레코드 삭제", type="secondary", use_container_width=True, key="edit_delete_btn"):
                 st.session_state["confirm_delete"] = True
