@@ -182,14 +182,7 @@ def fetch_all_dataframes():
 
 
 # --- 3. 공통 그래프 그리기 함수 ---
-def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order):
-    # [방어 코드] 이전 figure 잔재(axes/patches/texts/lines) 완전 초기화
-    for ax in fig.axes:
-        fig.delaxes(ax)
-    fig.patches.clear()
-    fig.lines.clear()
-    fig.texts.clear()
-
+def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order, class_cat_ratio=None, class_unit_avg_data=None):
     border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False, edgecolor=COLOR_RED, linewidth=5.0, transform=fig.transFigure, zorder=10)
     fig.patches.append(border)
 
@@ -233,6 +226,19 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     
     ax1.set_theta_direction(-1); ax1.set_theta_offset(np.pi/2.0)
     ax1.plot(angles, s_vals, color=COLOR_RED, linewidth=2.5, label='학생 점수')
+    ax1.fill(angles, s_vals, color=COLOR_RED, alpha=0.08)
+
+    # 시험지 전체 평균 선
+    avg_ordered = avg_cat_ratio.reindex(ordered_labels).fillna(0)
+    avg_vals = avg_ordered.values.tolist() + [avg_ordered.values[0]]
+    ax1.plot(angles, avg_vals, color=COLOR_AVG, linewidth=1.8, linestyle='--', label='시험지 평균')
+
+    # 같은 반 평균 선
+    if class_cat_ratio is not None:
+        cls_ordered = class_cat_ratio.reindex(ordered_labels).fillna(0)
+        cls_vals = cls_ordered.values.tolist() + [cls_ordered.values[0]]
+        ax1.plot(angles, cls_vals, color=COLOR_UNIT, linewidth=1.8, linestyle=':', label='같은 반 평균')
+
     ax1.set_ylim(0, ax1_limit); ax1.set_xticks(angles[:-1]); ax1.set_xticklabels([]); ax1.set_yticklabels([]) 
     
     for i in range(len(labels)):
@@ -247,12 +253,10 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
             ha = 'left' if 0 < angle < np.pi else 'right'
             
         ax1.text(angle, dist, label_text, fontsize=10, fontweight='bold', va=va, ha=ha, color=COLOR_NAVY)
-        
-        s_v = int(s_vals[i])
-        td = s_v - (ax1_limit * 0.12) if s_v > ax1_limit * 0.85 else s_v + (ax1_limit * 0.12)
-        txt_s = ax1.text(angle, td, f"{s_v}%", fontsize=9, fontweight='bold', color=COLOR_RED, va='center', ha='center')
-        txt_s.set_path_effects([path_effects.withStroke(linewidth=3, foreground='white')])
-    
+
+    # 범례
+    ax1.legend(loc='upper right', bbox_to_anchor=(1.35, 1.15), fontsize=7, framealpha=0.7)
+
     title1 = ax1.set_title("▶ 영역별 핵심 역량 지표 (%)", pad=30, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title1.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
 
@@ -268,21 +272,37 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test, c
     max_b_val = s_pct.max() if not s_pct.empty else 0
     ax2_limit = max(40, min(110, max_b_val + (max_b_val * 0.25) + 15)) 
     
-    ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3)
-    
+    ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.9, width=bar_width, zorder=3, label='학생 점수')
+
+    # 시험지 전체 평균 선
+    if unit_avg_data is not None and not unit_avg_data.empty:
+        avg_total = unit_avg_data.reindex(final_unit_data.index).fillna(0)
+        avg_unit_pct = []
+        for u in final_unit_data.index:
+            u_info_rows = unit_avg_data.loc[[u]] if u in unit_avg_data.index else None
+            # unit_avg_data에는 평균득점만 있으므로 배점은 unit_data에서 가져옴
+            denom = final_unit_data.loc[u, '배점'] if u in final_unit_data.index else 0
+            numer = unit_avg_data.loc[u, '평균득점'] if u in unit_avg_data.index else 0
+            avg_unit_pct.append((numer / denom * 100) if denom > 0 else 0)
+        ax2.plot(x_pos, avg_unit_pct, color=COLOR_AVG, linewidth=1.8, linestyle='--', marker='o', markersize=4, zorder=4, label='시험지 평균')
+
+    # 같은 반 평균 선
+    if class_unit_avg_data is not None and not class_unit_avg_data.empty:
+        cls_unit_pct = []
+        for u in final_unit_data.index:
+            denom = final_unit_data.loc[u, '배점'] if u in final_unit_data.index else 0
+            numer = class_unit_avg_data.loc[u, '평균득점'] if u in class_unit_avg_data.index else 0
+            cls_unit_pct.append((numer / denom * 100) if denom > 0 else 0)
+        ax2.plot(x_pos, cls_unit_pct, color=COLOR_UNIT, linewidth=1.8, linestyle=':', marker='s', markersize=4, zorder=4, label='같은 반 평균')
+
+    ax2.legend(loc='upper right', fontsize=7, framealpha=0.7)
+
     ax2.set_xticks(x_pos)
     ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in final_unit_data.index], fontsize=8, fontweight='bold')
     ax2.tick_params(axis='x', which='both', length=0) 
     ax2.set_ylim(0, ax2_limit); ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
     title2 = ax2.set_title("▶ 단원별 성취도 (%)", pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
-    
-    for i in range(len(x_pos)):
-        val = int(s_pct.iloc[i])
-        pos = x_pos[i]
-        y_p = val + (ax2_limit * 0.04)
-        t = ax2.text(pos, y_p, f"{val}%", ha='center', va='bottom', fontsize=7.5, fontweight='bold', color=COLOR_STUDENT)
-        t.set_path_effects([path_effects.withStroke(linewidth=2, foreground='white')])
 
     # --- 하단 심층 분석 박스 ---
     rect_diag = plt.Rectangle((0.08, 0.12), 0.84, 0.35, fill=True, facecolor=COLOR_BG, edgecolor=COLOR_GRID, transform=fig.transFigure)
@@ -462,13 +482,12 @@ def prepare_report_data(selected_test):
     unit_avg_data = total_analysis.groupby('단원').agg({'평균득점': 'sum'})
     unit_avg_data = unit_avg_data.reindex([u for u in unit_order if u in unit_avg_data.index])
     
-    return df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary
+    return df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary, total_analysis
 
 
 def generate_jeet_expert_report(target_name, selected_test):
     try:
-        df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary = prepare_report_data(selected_test)
-# 이 위쪽 코드들과 줄 맞춤(세로 선)이 같아야 합니다.
+        df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary, total_analysis = prepare_report_data(selected_test)
         student_found = False
         img_buffer = io.BytesIO()
         
@@ -506,14 +525,31 @@ def generate_jeet_expert_report(target_name, selected_test):
             unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
             unit_data = unit_data.reindex(unit_order).fillna(0)
 
-            plt.close('all')  # 이전 figure 잔재 완전 정리
-            fig = plt.figure(figsize=(8.27, 11.69), dpi=150)
-            fig.patch.set_facecolor('white')
-            draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
+            # 같은 반 평균 계산
+            student_class = str(s_row.get('반', '')).strip()
+            class_students = df_results[df_results['반'].astype(str).str.strip() == student_class]
+            class_cat_ratio = None
+            class_unit_avg_data = None
+            if len(class_students) > 1:
+                cls_analysis = df_info.copy()
+                cls_scores = pd.DataFrame(index=class_students.index, columns=cls_analysis['문항번호'].tolist())
+                for q in cls_analysis['문항번호'].tolist():
+                    if q in class_students.columns:
+                        cls_scores[q] = class_students[q].apply(safe_to_binary)
+                    else:
+                        cls_scores[q] = 0
+                cls_avg_per_q = cls_scores.mean()
+                cls_total = cls_analysis.copy()
+                cls_total['평균득점'] = cls_total['문항번호'].apply(lambda x: cls_avg_per_q.get(str(x), 0))
+                class_cat_ratio = (cls_total.groupby('영역')['평균득점'].sum() / cls_total.groupby('영역')['배점'].sum() * 100).fillna(0)
+                class_unit_avg_data = cls_total.groupby('단원').agg({'평균득점': 'sum'})
+                class_unit_avg_data = class_unit_avg_data.reindex([u for u in unit_order if u in class_unit_avg_data.index])
+
+            fig = plt.figure(figsize=(8.27, 11.69))
+            draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order, class_cat_ratio, class_unit_avg_data)
             
-            fig.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight',
-                        facecolor='white', edgecolor='none')
-            plt.close('all')  # 저장 후 완전 정리
+            fig.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
+            plt.close(fig)
             break
             
         if not student_found: return False, None, "학생을 찾을 수 없습니다."
@@ -525,7 +561,7 @@ def generate_jeet_expert_report(target_name, selected_test):
 
 def generate_batch_report(target_class, selected_test, selected_students=None):
     try:
-        df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary = prepare_report_data(selected_test)
+        df_info, df_results, avg_cat_ratio, unit_avg_data, unit_order, safe_to_binary, total_analysis = prepare_report_data(selected_test)
         
         class_students = df_results[df_results['반'].astype(str).str.strip() == str(target_class).strip()]
         class_students = class_students.drop_duplicates(subset=['이름'], keep='first')
@@ -558,18 +594,37 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                 unit_data = analysis.groupby('단원').agg({'득점': 'sum', '배점': 'sum'})
                 unit_data = unit_data.reindex(unit_order).fillna(0)
 
-                # [수정] 이전 figure 완전 정리 후 새 figure 생성
-                plt.close('all')
-                fig = plt.figure(figsize=(8.27, 11.69), dpi=150)
-                fig.patch.set_facecolor('white')
-                draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order)
+                # 같은 반 평균 계산
+                student_class = str(s_row.get('반', '')).strip()
+                same_class = df_results[df_results['반'].astype(str).str.strip() == student_class]
+                class_cat_ratio = None
+                class_unit_avg_data = None
+                if len(same_class) > 1:
+                    cls_analysis = df_info.copy()
+                    cls_scores = pd.DataFrame(index=same_class.index, columns=cls_analysis['문항번호'].tolist())
+                    for q in cls_analysis['문항번호'].tolist():
+                        if q in same_class.columns:
+                            cls_scores[q] = same_class[q].apply(safe_to_binary)
+                        else:
+                            cls_scores[q] = 0
+                    cls_avg_per_q = cls_scores.mean()
+                    cls_total = cls_analysis.copy()
+                    cls_total['평균득점'] = cls_total['문항번호'].apply(lambda x: cls_avg_per_q.get(str(x), 0))
+                    class_cat_ratio = (cls_total.groupby('영역')['평균득점'].sum() / cls_total.groupby('영역')['배점'].sum() * 100).fillna(0)
+                    class_unit_avg_data = cls_total.groupby('단원').agg({'평균득점': 'sum'})
+                    class_unit_avg_data = class_unit_avg_data.reindex([u for u in unit_order if u in class_unit_avg_data.index])
+
+                # [수정] 신규 그래프 객체 생성 (A4 세로 비율)
+                fig = plt.figure(figsize=(8.27, 11.69), dpi=300)
+                draw_report_figure(fig, s_row, student_name, student_grade, selected_test, cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order, class_cat_ratio, class_unit_avg_data)
                 
                 temp_img_buffer = io.BytesIO()
-                fig.savefig(temp_img_buffer, format='png', dpi=150, bbox_inches='tight',
-                            facecolor='white', edgecolor='none')
+                # [수정] 세로 방향 강제 고정 및 저장
+                fig.savefig(temp_img_buffer, format='png', dpi=300, bbox_inches='tight', orientation='portrait')
                 
-                # [수정] 저장 후 완전 정리 (겹침 방지 핵심)
-                plt.close('all')
+                # [수정] 메모리 정리 (겹침 방지 핵심)
+                plt.clf()
+                plt.close(fig)
                 
                 file_name = f"{student_name}_리포트.png"
                 zip_file.writestr(file_name, temp_img_buffer.getvalue())
