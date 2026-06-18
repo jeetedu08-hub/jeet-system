@@ -39,8 +39,8 @@ COLOR_NAVY = '#1A237E'
 COLOR_RED = '#D32F2F'
 # ── 수정된 색상 팔레트 ──────────────────────────────────────
 COLOR_STUDENT = '#1565C0'   # 학생: 파랑 (막대그래프)
-COLOR_UNIT    = '#E65100'   # 같은 반 평균: 진한 주황
-COLOR_AVG     = '#2E7D32'   # 시험지 전체 평균: 초록
+COLOR_UNIT    = '#E65100'   # 반 평균: 진한 주황
+COLOR_AVG     = '#2E7D32'   # 과정 평균: 초록
 # 방사형 전용 fill 색상 (투명도 포함이라 별도 관리)
 COLOR_RADAR_STUDENT = '#1565C0'
 COLOR_RADAR_UNIT    = '#E65100'
@@ -238,7 +238,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
     avg_scaled = scale_list(avg_raw) + [scale_to_display(avg_raw[0])]
     ax1.plot(angles, avg_scaled,
              color=COLOR_RADAR_AVG, linewidth=1.8, linestyle='--', dashes=(5, 3), zorder=4,
-             label='시험지 평균')
+             label='과정 평균')
     ax1.fill(angles, avg_scaled, color=COLOR_RADAR_AVG, alpha=0.13, zorder=2)
 
     # ── 같은 반 평균: 주황 일점쇄선(-.) + 채우기 ─────────────
@@ -247,7 +247,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
         cls_scaled = scale_list(cls_raw) + [scale_to_display(cls_raw[0])]
         ax1.plot(angles, cls_scaled,
                  color=COLOR_RADAR_UNIT, linewidth=1.8, linestyle='-.', zorder=4,
-                 label='같은 반 평균')
+                 label='반 평균')
         ax1.fill(angles, cls_scaled, color=COLOR_RADAR_UNIT, alpha=0.13, zorder=1)
 
     ax1_limit = max(50, min(115, max(s_scaled) + 10))
@@ -307,7 +307,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
                  color=COLOR_AVG, linewidth=2.2, linestyle='-',
                  marker='o', markersize=6,
                  markerfacecolor='white', markeredgewidth=2,
-                 zorder=5, label='시험지 평균')
+                 zorder=5, label='과정 평균')
 
     # ── 같은 반 평균: 주황 실선 + 다이아몬드 마커 ─────────────
     if class_unit_avg_data is not None and not class_unit_avg_data.empty:
@@ -321,7 +321,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
                  color=COLOR_UNIT, linewidth=2.2, linestyle='-',
                  marker='D', markersize=5,
                  markerfacecolor='white', markeredgewidth=2,
-                 zorder=5, label='같은 반 평균')
+                 zorder=5, label='반 평균')
 
     ax2.legend(loc='upper right', fontsize=7.5, framealpha=0.85, handlelength=2.5)
     ax2.set_xticks(x_pos)
@@ -396,22 +396,22 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
     c_warn = cat_ratio[cat_ratio < 20].index.tolist()
 
     diag_combined = ""
-    if c_best: diag_combined += f"특히 {', '.join([f'[{c}]' for c in c_best])} 영역에서 압도적인 강점을 나타냅니다. 최고 난도 문항을 통해 사고의 확장을 이어가야 합니다. "
-    if c_good: diag_combined += f"{', '.join([f'[{c}]' for c in c_good])} 영역은 견고한 기본기를 증명하였습니다. 심화 유형에 대한 반복 훈련이 병행되어야 합니다. "
-    if c_weak: diag_combined += f"{', '.join([f'[{c}]' for c in c_weak])} 영역은 개념 간 유기적 연결성 이해와 유사 유형 집중 분석이 필요합니다. "
-    if c_warn: diag_combined += f"{', '.join([f'[{c}]' for c in c_warn])} 영역은 기초 개념 재정립과 필수 유형 집중 학습이 필요합니다. "
+    if c_best: diag_combined += f"특히 {', '.join([f'[{c}]' for c in c_best])} 영역에서 정교한 논리 구조와 높은 응용력을 보이며 압도적인 강점을 나타냅니다. 현재의 감각을 유지하며 최고 난도 문항을 통해 사고의 확장을 이어가야 합니다. "
+    if c_good: diag_combined += f"{', '.join([f'[{c}]' for c in c_good])} 영역은 안정적인 정답률로 견고한 기본기를 증명하였습니다. 다만, 문항의 복합도가 높아질 때 발생하는 오답을 줄이기 위해 심화 유형에 대한 반복 훈련이 병행되어야 합니다. "
+    if c_weak: diag_combined += f"{', '.join([f'[{c}]' for c in c_weak])} 영역은 복합 개념을 문제에 투영하는 과정에서 다소 고전하는 모습이 보입니다. 단편적인 문제 풀이보다는 개념 간의 유기적 연결성을 이해하고 유사 유형을 집중 분석하는 보완 작업이 필요합니다. "
+    if c_warn: diag_combined += f"{', '.join([f'[{c}]' for c in c_warn])} 영역은 단원 간 연계성이 높은 만큼, 기초 개념의 재정립과 필수 유형에 대한 집중 학습이 필요합니다. 단계별 맞춤 문항을 통해 이해도를 근본적으로 끌어올려 실력을 끌어올릴 필요가 있습니다. "
 
     g_best = u_res[u_res >= 80].index.tolist()
     g_good = u_res[(u_res >= 50) & (u_res < 80)].index.tolist()
     g_weak = u_res[(u_res >= 20) & (u_res < 50)].index.tolist()
     g_warn = u_res[u_res < 20].index.tolist()
 
-    if g_best: diag_combined += f"{', '.join([f'<{u}>' for u in g_best])} 단원은 심화 단계까지 완벽히 소화하고 있습니다. 킬러 문항 중심의 도전적 학습이 필요합니다. "
-    if g_good: diag_combined += f"{', '.join([f'<{u}>' for u in g_good])} 단원은 응용 문항 적응력을 키워야 할 시점입니다. "
-    if g_weak: diag_combined += f"{', '.join([f'<{u}>' for u in g_weak])} 단원은 핵심 유형의 반복 숙달이 필요합니다. "
-    if g_warn: diag_combined += f"{', '.join([f'<{u}>' for u in g_warn])} 단원은 기초 체력 보강이 시급합니다. 가정에서 따뜻한 격려 부탁드립니다. "
+    if g_best: diag_combined += f"{', '.join([f'<{u}>' for u in g_best])} 단원은 기본 및 응용 단계를 넘어 심화 단계까지 완벽히 소화하고 있습니다. 이제는 일반적인 유형 학습보다는 사고의 폭을 넓힐 수 있는 '킬러 문항' 중심의 도전적 학습이 필요한 단계입니다. "
+    if g_good: diag_combined += f"{', '.join([f'<{u}>' for u in g_good])} 단원은 필수 유형들은 막힘없이 해결하고 있습니다. 이제는 단편적인 문제 풀이에서 벗어나, 개념을 다각도로 비트는 응용 문항에 대한 적응력을 키워야 할 때입니다. 심화 문항 도전 횟수를 늘려 사고의 유연성을 기른다면 보다 높은 수학 실력을 갖출 수 있을 것으로 판단됩니다. "
+    if g_weak: diag_combined += f"{', '.join([f'<{u}>' for u in g_weak])} 단원은 개념의 조각들은 인지하고 있으나 실전 적용에서 병목 현상이 관찰됩니다. 난이도 높은 문제를 해결하기보다 핵심 유형의 반복 숙달이 필요하고, 성공적인 문제 풀이 경험을 축적하여 해당 단원의 수학적 자신감을 높인다면 한단계 더 발전할 수 있을 것으로 판단됩니다. "
+    if g_warn: diag_combined += f"{', '.join([f'<{u}>' for u in g_warn])} 단원은 현재는 잠재력이 발현되기 전의 응축 단계입니다. 수학적 기초 체력이 부족할 뿐, 적절한 자극과 맞춤형 관리가 병행된다면 충분히 반등할 수 있는 가능성을 가지고 있습니다. 아이가 포기하지 않도록 가정에서 따뜻한 격려 부탁드립니다. "
     if not (g_best or g_good or g_weak or g_warn):
-        diag_combined += "전반적인 단원별 성취도가 균형 있게 나타나고 있습니다."
+        diag_combined += "전반적인 단원별 성취도가 매우 균형 있게 나타나고 있습니다. 어느 한 쪽으로 치우치지 않는 고른 학습 균형이 큰 강점입니다."
 
     weak_list  = u_res[u_res < 40].index.tolist()
     avg_score  = u_res.mean()
