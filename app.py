@@ -6,6 +6,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import textwrap
 import matplotlib.font_manager as fm
 import matplotlib.patheffects as path_effects
+import matplotlib.patches as mpatches
 import traceback
 import streamlit as st
 import io
@@ -454,7 +455,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
 
         # ── 태그 배경 캡슐 ────────────────────────────────────
         tag_w  = len(tag) * 0.006 + 0.015
-        tag_rect = plt.FancyBboxPatch(
+        tag_rect = mpatches.FancyBboxPatch(
             (CONTENT_LEFT, curr_y - 0.016), tag_w, 0.018,
             boxstyle="round,pad=0.003",
             facecolor=tag_bg, edgecolor=tag_color, linewidth=0.8,
