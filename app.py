@@ -179,6 +179,12 @@ def scale_list(raw_list):
 # ────────────────────────────────────────────────────────────
 
 
+# ── 반명 정규화 헬퍼: 대소문자/공백 무시 ──────────────────
+def normalize_class_name(val):
+    return str(val).strip().replace(" ", "").upper()
+# ────────────────────────────────────────────────────────────
+
+
 # --- 3. 공통 그래프 그리기 함수 ---
 def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
                        cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order,
@@ -614,8 +620,13 @@ def generate_jeet_expert_report(target_name, selected_test):
             unit_data = analysis.groupby('단원').agg({'득점':'sum', '배점':'sum'})
             unit_data = unit_data.reindex(unit_order).fillna(0)
 
-            student_class = str(s_row.get('반', '')).strip()
-            class_students = df_results[df_results['반'].astype(str).str.strip() == student_class]
+            # ── 반 평균: 학년 + 반명(대소문자/공백 무시) 모두 일치하는 학생끼리만 ──
+            student_class_norm = normalize_class_name(s_row.get('반', ''))
+            student_grade_s    = str(s_row.get('학년', '')).strip()
+            class_students = df_results[
+                (df_results['반'].astype(str).apply(normalize_class_name) == student_class_norm) &
+                (df_results['학년'].astype(str).str.strip() == student_grade_s)
+            ]
             class_cat_ratio = class_unit_avg_data = None
             if len(class_students) > 1:
                 cls_analysis = df_info.copy()
@@ -683,8 +694,13 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                 unit_data = analysis.groupby('단원').agg({'득점':'sum','배점':'sum'})
                 unit_data = unit_data.reindex(unit_order).fillna(0)
 
-                student_class = str(s_row.get('반', '')).strip()
-                same_class    = df_results[df_results['반'].astype(str).str.strip() == student_class]
+                # ── 반 평균: 학년 + 반명(대소문자/공백 무시) 모두 일치하는 학생끼리만 ──
+                student_class_norm = normalize_class_name(s_row.get('반', ''))
+                student_grade_s    = str(s_row.get('학년', '')).strip()
+                same_class    = df_results[
+                    (df_results['반'].astype(str).apply(normalize_class_name) == student_class_norm) &
+                    (df_results['학년'].astype(str).str.strip() == student_grade_s)
+                ]
                 class_cat_ratio = class_unit_avg_data = None
                 if len(same_class) > 1:
                     cls_analysis = df_info.copy()
