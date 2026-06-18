@@ -188,7 +188,18 @@ def normalize_class_name(val):
 # --- 3. 공통 그래프 그리기 함수 ---
 def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
                        cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order,
-                       class_cat_ratio=None, class_unit_avg_data=None):
+                       class_cat_ratio=None, class_unit_avg_data=None, is_new=False):
+
+    # ── 신규생: 실제 수치(0~100) 그대로 / 재원생: 기존 보정 스케일(20~100) ──
+    #   is_new=True 면 보정 함수를 항등함수로 대체하여 실제 % 를 그대로 사용
+    if is_new:
+        _scale  = lambda v: float(v)                 # 보정 없음 (실제값)
+        _scalel = lambda lst: [float(v) for v in lst]
+        class_cat_ratio = None                        # 신규생: 반 평균 제거
+        class_unit_avg_data = None
+    else:
+        _scale  = scale_to_display                    # 기존 보정
+        _scalel = scale_list
 
     border = plt.Rectangle((0.015, 0.015), 0.97, 0.97, fill=False,
                             edgecolor=COLOR_RED, linewidth=5.0,
@@ -233,7 +244,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
 
     # ── 학생: 파랑 실선(-) + 진한 채우기 ─────────────────────
     s_raw    = s_ordered.values.tolist()
-    s_scaled = scale_list(s_raw) + [scale_to_display(s_raw[0])]
+    s_scaled = _scalel(s_raw) + [_scale(s_raw[0])]
     ax1.plot(angles, s_scaled,
              color=COLOR_RADAR_STUDENT, linewidth=2.2, linestyle='-', zorder=4,
              label='학생 점수')
@@ -241,7 +252,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
 
     # ── 시험지 전체 평균: 초록 파선(--) + 채우기 ──────────────
     avg_raw    = avg_cat_ratio.reindex(ordered_labels).fillna(0).values.tolist()
-    avg_scaled = scale_list(avg_raw) + [scale_to_display(avg_raw[0])]
+    avg_scaled = _scalel(avg_raw) + [_scale(avg_raw[0])]
     ax1.plot(angles, avg_scaled,
              color=COLOR_RADAR_AVG, linewidth=1.8, linestyle='--', dashes=(5, 3), zorder=4,
              label='과정 평균')
@@ -250,7 +261,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
     # ── 같은 반 평균: 주황 일점쇄선(-.) + 채우기 ─────────────
     if class_cat_ratio is not None:
         cls_raw    = class_cat_ratio.reindex(ordered_labels).fillna(0).values.tolist()
-        cls_scaled = scale_list(cls_raw) + [scale_to_display(cls_raw[0])]
+        cls_scaled = _scalel(cls_raw) + [_scale(cls_raw[0])]
         ax1.plot(angles, cls_scaled,
                  color=COLOR_RADAR_UNIT, linewidth=1.8, linestyle='-.', zorder=4,
                  label='반 평균')
@@ -293,9 +304,13 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
 
     # 실제 점수 비율(0~100) 계산 후 20~100 범위로 스케일
     s_pct_raw = (final_unit_data['득점'] / final_unit_data['배점'] * 100).fillna(0)
-    s_pct     = s_pct_raw.apply(scale_to_display)          # 표시용 스케일
+    s_pct     = s_pct_raw.apply(_scale)                    # 표시용 (신규생=실제값)
     max_b_val = s_pct.max() if not s_pct.empty else 0
-    ax2_limit = max(50, min(115, max_b_val + 15))
+    if is_new:
+        # 신규생: 실제값(0~100) 기준, 0부터 시작
+        ax2_limit = max(50, min(105, max_b_val + 15))
+    else:
+        ax2_limit = max(50, min(115, max_b_val + 15))
 
     # ── 학생 막대: 파랑 ────────────────────────────────────────
     ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.85,
@@ -308,7 +323,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
             denom  = final_unit_data.loc[u, '배점'] if u in final_unit_data.index else 0
             numer  = unit_avg_data.loc[u, '평균득점'] if u in unit_avg_data.index else 0
             raw_pct = (numer / denom * 100) if denom > 0 else 0
-            avg_unit_pct.append(scale_to_display(raw_pct))
+            avg_unit_pct.append(_scale(raw_pct))
         ax2.plot(x_pos, avg_unit_pct,
                  color=COLOR_AVG, linewidth=2.2, linestyle='-',
                  marker='o', markersize=6,
@@ -322,7 +337,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
             denom  = final_unit_data.loc[u, '배점'] if u in final_unit_data.index else 0
             numer  = class_unit_avg_data.loc[u, '평균득점'] if u in class_unit_avg_data.index else 0
             raw_pct = (numer / denom * 100) if denom > 0 else 0
-            cls_unit_pct.append(scale_to_display(raw_pct))
+            cls_unit_pct.append(_scale(raw_pct))
         ax2.plot(x_pos, cls_unit_pct,
                  color=COLOR_UNIT, linewidth=2.2, linestyle='-',
                  marker='D', markersize=5,
@@ -335,12 +350,18 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
                         fontsize=8, fontweight='bold')
     ax2.tick_params(axis='x', which='both', length=0)
 
-    # y축: 20(=0%) ~ ax2_limit, 눈금을 실제 점수 기준으로 표시
-    ax2.set_ylim(20, ax2_limit)
-    ytick_real  = [0, 20, 40, 60, 80, 100]
-    ytick_disp  = [scale_to_display(v) for v in ytick_real]
-    ytick_disp  = [v for v in ytick_disp if 20 <= v <= ax2_limit]
-    ytick_label = [f"{int(round((v - 20) / 0.8))}%" for v in ytick_disp]
+    # y축 눈금: 재원생은 보정(20=0%) 기준, 신규생은 실제 % 기준
+    if is_new:
+        ax2.set_ylim(0, ax2_limit)
+        ytick_real  = [0, 20, 40, 60, 80, 100]
+        ytick_disp  = [v for v in ytick_real if 0 <= v <= ax2_limit]
+        ytick_label = [f"{int(v)}%" for v in ytick_disp]
+    else:
+        ax2.set_ylim(20, ax2_limit)
+        ytick_real  = [0, 20, 40, 60, 80, 100]
+        ytick_disp  = [scale_to_display(v) for v in ytick_real]
+        ytick_disp  = [v for v in ytick_disp if 20 <= v <= ax2_limit]
+        ytick_label = [f"{int(round((v - 20) / 0.8))}%" for v in ytick_disp]
     ax2.set_yticks(ytick_disp)
     ax2.set_yticklabels(ytick_label, fontsize=7)
     ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
@@ -644,9 +665,10 @@ def generate_jeet_expert_report(target_name, selected_test):
                     [u for u in unit_order if u in class_unit_avg_data.index])
 
             fig = plt.figure(figsize=(8.27, 11.69))
+            is_new_student = str(s_row.get('구분', '재원생')).strip() == '신규생'
             draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
                                cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order,
-                               class_cat_ratio, class_unit_avg_data)
+                               class_cat_ratio, class_unit_avg_data, is_new=is_new_student)
             fig.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
             plt.close(fig)
             break
@@ -718,9 +740,10 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                         [u for u in unit_order if u in class_unit_avg_data.index])
 
                 fig = plt.figure(figsize=(8.27, 11.69), dpi=300)
+                is_new_student = str(s_row.get('구분', '재원생')).strip() == '신규생'
                 draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
                                    cat_ratio, avg_cat_ratio, unit_data, unit_avg_data, unit_order,
-                                   class_cat_ratio, class_unit_avg_data)
+                                   class_cat_ratio, class_unit_avg_data, is_new=is_new_student)
                 
                 temp_buf = io.BytesIO()
                 fig.savefig(temp_buf, format='png', dpi=300, bbox_inches='tight', orientation='portrait')
