@@ -387,7 +387,9 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
                  markerfacecolor='white', markeredgewidth=2,
                  zorder=5, label='반 평균')
 
-    ax2.legend(loc='upper right', fontsize=7.5, framealpha=0.85, handlelength=2.5)
+    ax2.legend(loc='lower center', bbox_to_anchor=(0.5, 1.02),
+               ncol=3, fontsize=7.5, framealpha=0.9, handlelength=2.0,
+               columnspacing=1.2, borderaxespad=0.2)
     ax2.set_xticks(x_pos)
     ax2.set_xticklabels([textwrap.fill(str(l), 5) for l in final_unit_data.index],
                         fontsize=8, fontweight='bold')
@@ -410,7 +412,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
     ax2.grid(axis='y', color=COLOR_GRID, linestyle='-', linewidth=0.5, zorder=0)
 
     title2 = ax2.set_title("▶ 단원별 성취도 (%)",
-                            pad=25, fontsize=14, fontweight='bold', color=COLOR_NAVY)
+                            pad=34, fontsize=14, fontweight='bold', color=COLOR_NAVY)
     title2.set_path_effects([path_effects.withStroke(linewidth=1, foreground=COLOR_NAVY)])
 
     # ══════════════════════════════════════════════════════════
