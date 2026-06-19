@@ -633,9 +633,11 @@ def prepare_report_data(selected_test):
     else:
         df_scores = pd.DataFrame(0, index=[0], columns=q_cols)
 
-    avg_per_q      = df_scores.mean()
+    avg_per_q      = df_scores.mean()   # 문항별 정답률(0~1)
     total_analysis = df_info.copy()
-    total_analysis['평균득점'] = total_analysis['문항번호'].apply(lambda x: avg_per_q.get(str(x), 0))
+    # 정답률(0~1)에 배점을 곱해 '평균 득점'으로 변환 → 학생 득점과 동일한 단위
+    total_analysis['정답률'] = total_analysis['문항번호'].apply(lambda x: avg_per_q.get(str(x), 0))
+    total_analysis['평균득점'] = total_analysis['정답률'] * total_analysis['배점']
     
     avg_cat_ratio = (total_analysis.groupby('영역')['평균득점'].sum() /
                      total_analysis.groupby('영역')['배점'].sum() * 100).fillna(0)
@@ -690,9 +692,10 @@ def generate_jeet_expert_report(target_name, selected_test):
                                             columns=cls_analysis['문항번호'].tolist())
                 for q in cls_analysis['문항번호'].tolist():
                     cls_scores[q] = class_students[q].apply(safe_to_binary) if q in class_students.columns else 0
-                cls_avg_per_q = cls_scores.mean()
+                cls_avg_per_q = cls_scores.mean()   # 반 문항별 정답률(0~1)
                 cls_total     = cls_analysis.copy()
-                cls_total['평균득점'] = cls_total['문항번호'].apply(lambda x: cls_avg_per_q.get(str(x), 0))
+                cls_total['정답률'] = cls_total['문항번호'].apply(lambda x: cls_avg_per_q.get(str(x), 0))
+                cls_total['평균득점'] = cls_total['정답률'] * cls_total['배점']
                 class_cat_ratio = (cls_total.groupby('영역')['평균득점'].sum() /
                                    cls_total.groupby('영역')['배점'].sum() * 100).fillna(0)
                 class_unit_avg_data = cls_total.groupby('단원').agg({'평균득점':'sum'})
@@ -767,7 +770,8 @@ def generate_batch_report(target_class, selected_test, selected_students=None):
                         cls_scores[q] = same_class[q].apply(safe_to_binary) if q in same_class.columns else 0
                     cls_avg_per_q = cls_scores.mean()
                     cls_total     = cls_analysis.copy()
-                    cls_total['평균득점'] = cls_total['문항번호'].apply(lambda x: cls_avg_per_q.get(str(x), 0))
+                    cls_total['정답률'] = cls_total['문항번호'].apply(lambda x: cls_avg_per_q.get(str(x), 0))
+                    cls_total['평균득점'] = cls_total['정답률'] * cls_total['배점']
                     class_cat_ratio = (cls_total.groupby('영역')['평균득점'].sum() /
                                        cls_total.groupby('영역')['배점'].sum() * 100).fillna(0)
                     class_unit_avg_data = cls_total.groupby('단원').agg({'평균득점':'sum'})
