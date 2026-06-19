@@ -270,6 +270,8 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
     ax1.fill(angles, avg_scaled, color=COLOR_RADAR_AVG, alpha=0.13, zorder=2)
 
     # ── 같은 반 평균: 주황 일점쇄선(-.) + 채우기 ─────────────
+    radar_max = max(s_scaled)          # 학생/과정/반 평균 전체의 최댓값 추적
+    radar_max = max(radar_max, max(avg_scaled))
     if class_cat_ratio is not None:
         cls_raw    = class_cat_ratio.reindex(ordered_labels).fillna(0).values.tolist()
         cls_scaled = _scalel(cls_raw) + [_scale(cls_raw[0])]
@@ -277,8 +279,10 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
                  color=COLOR_RADAR_UNIT, linewidth=1.8, linestyle='-.', zorder=4,
                  label='반 평균')
         ax1.fill(angles, cls_scaled, color=COLOR_RADAR_UNIT, alpha=0.13, zorder=1)
+        radar_max = max(radar_max, max(cls_scaled))
 
-    ax1_limit = max(50, min(115, max(s_scaled) + 10))
+    # 세 선 모두가 안에 들어오도록 전체 최댓값 기준으로 상한 설정 (+여유 10)
+    ax1_limit = max(50, min(120, radar_max + 10))
     ax1.set_ylim(0, ax1_limit)
     ax1.set_xticks(angles[:-1])
     ax1.set_xticklabels([])
@@ -317,11 +321,27 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
     s_pct_raw = (final_unit_data['득점'] / final_unit_data['배점'] * 100).fillna(0)
     s_pct     = s_pct_raw.apply(_scale)                    # 표시용 (신규생=실제값)
     max_b_val = s_pct.max() if not s_pct.empty else 0
+
+    # 평균선들도 상한 계산에 포함 (학생보다 높아도 잘리지 않도록)
+    def _avg_line_scaled(avg_df):
+        vals = []
+        for u in final_unit_data.index:
+            denom = final_unit_data.loc[u, '배점'] if u in final_unit_data.index else 0
+            numer = avg_df.loc[u, '평균득점'] if u in avg_df.index else 0
+            vals.append(_scale((numer / denom * 100) if denom > 0 else 0))
+        return vals
+
+    avg_unit_pct = (_avg_line_scaled(unit_avg_data)
+                    if unit_avg_data is not None and not unit_avg_data.empty else [])
+    cls_unit_pct = (_avg_line_scaled(class_unit_avg_data)
+                    if class_unit_avg_data is not None and not class_unit_avg_data.empty else [])
+    max_b_val = max([max_b_val] + avg_unit_pct + cls_unit_pct)
+
     if is_new:
         # 신규생: 실제값(0~100) 기준, 0부터 시작 (막대 위 수치 라벨 공간 확보)
-        ax2_limit = max(55, min(112, max_b_val + 18))
+        ax2_limit = max(55, min(120, max_b_val + 18))
     else:
-        ax2_limit = max(50, min(115, max_b_val + 15))
+        ax2_limit = max(50, min(120, max_b_val + 15))
 
     # ── 학생 막대: 파랑 ────────────────────────────────────────
     ax2.bar(x_pos, s_pct, color=COLOR_STUDENT, alpha=0.85,
@@ -339,13 +359,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
                          path_effects=[path_effects.withStroke(linewidth=2.0, foreground='white')])
 
     # ── 시험지 전체 평균: 초록 실선 + 원형 마커 ───────────────
-    if unit_avg_data is not None and not unit_avg_data.empty:
-        avg_unit_pct = []
-        for u in final_unit_data.index:
-            denom  = final_unit_data.loc[u, '배점'] if u in final_unit_data.index else 0
-            numer  = unit_avg_data.loc[u, '평균득점'] if u in unit_avg_data.index else 0
-            raw_pct = (numer / denom * 100) if denom > 0 else 0
-            avg_unit_pct.append(_scale(raw_pct))
+    if avg_unit_pct:
         ax2.plot(x_pos, avg_unit_pct,
                  color=COLOR_AVG, linewidth=2.2, linestyle='-',
                  marker='o', markersize=6,
@@ -366,13 +380,7 @@ def draw_report_figure(fig, s_row, student_name, student_grade, selected_test,
                              path_effects=[path_effects.withStroke(linewidth=1.8, foreground='white')])
 
     # ── 같은 반 평균: 주황 실선 + 다이아몬드 마커 ─────────────
-    if class_unit_avg_data is not None and not class_unit_avg_data.empty:
-        cls_unit_pct = []
-        for u in final_unit_data.index:
-            denom  = final_unit_data.loc[u, '배점'] if u in final_unit_data.index else 0
-            numer  = class_unit_avg_data.loc[u, '평균득점'] if u in class_unit_avg_data.index else 0
-            raw_pct = (numer / denom * 100) if denom > 0 else 0
-            cls_unit_pct.append(_scale(raw_pct))
+    if cls_unit_pct:
         ax2.plot(x_pos, cls_unit_pct,
                  color=COLOR_UNIT, linewidth=2.2, linestyle='-',
                  marker='D', markersize=5,
